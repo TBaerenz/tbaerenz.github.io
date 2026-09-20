@@ -3,96 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Builder IDE - Lineart Design</title>
+    <title>Browser IDE - Edu-to-Pro</title>
+    
+    <!-- JSZip Bibliothek -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
         /* =========================================
            Theme Variablen & Farbpaletten
            ========================================= */
         :root {
-            /* Neutrale Backgrounds (Light) - Komplett überarbeitet, sehr clean */
-            --bg-main: #f8fafc; /* Heller Hintergrund */
-            --bg-panel: #ffffff; /* Weiße Panels */
-            --bg-nav: #f1f5f9; /* Dezentes Grau für Leisten */
-            --bg-canvas: #e2e8f0; /* Canvas Hintergrund */
+            --bg-main: #f8fafc; --bg-panel: #ffffff; --bg-nav: #f1f5f9; --bg-canvas: #e2e8f0;
             --border-color: #cbd5e1;
-            
-            --text-main: #0f172a; 
-            --text-muted: #64748b; 
-            
-            --console-bg: #1e293b; 
-            --console-text: #fde047; 
-            --device-frame: #334155;
+            --text-main: #0f172a; --text-muted: #64748b; 
+            --console-bg: #1e293b; --console-text: #fde047; --device-frame: #334155;
+            --editor-bg: #ffffff; --editor-text: #334155;
+            --block-bg-color: #f8fafc; --block-border: #cbd5e1;
         }
 
         [data-theme="dark"] {
-            /* Neutrale Backgrounds (Dark) */
             --bg-main: #1c1917; --bg-panel: #292524; --bg-nav: #1c1917; --bg-canvas: #0c0a09;
             --border-color: #44403c;
-            
-            --text-main: #fafaf9; 
-            --text-muted: #a8a29e; 
-            
-            --console-bg: #000000; 
-            --console-text: #fbbf24; 
-            --device-frame: #57534e;
+            --text-main: #fafaf9; --text-muted: #a8a29e; 
+            --console-bg: #000000; --console-text: #fbbf24; --device-frame: #57534e;
+            --editor-bg: #1e1e1e; --editor-text: #d4d4d4;
+            --block-bg-color: #292524; --block-border: #44403c;
         }
 
-        /* --- Palette 1: Sunset Orange --- */
+        /* --- Paletten --- */
         [data-color="sunset"] { --accent-color: #ea580c; --block-bg: #f97316; --resizer-hover: #ea580c; --block-text: #ffffff; }
         [data-color="sunset"][data-theme="dark"] { --accent-color: #f97316; --block-bg: #fbbf24; --resizer-hover: #f97316; --block-text: #1c1917; }
-
-        /* --- Palette 2: Ocean Blue --- */
         [data-color="ocean"] { --accent-color: #0284c7; --block-bg: #0ea5e9; --resizer-hover: #0284c7; --block-text: #ffffff; }
         [data-color="ocean"][data-theme="dark"] { --accent-color: #38bdf8; --block-bg: #7dd3fc; --resizer-hover: #38bdf8; --block-text: #1c1917; }
-
-        /* --- Palette 3: Emerald Green --- */
         [data-color="emerald"] { --accent-color: #059669; --block-bg: #10b981; --resizer-hover: #059669; --block-text: #ffffff; }
         [data-color="emerald"][data-theme="dark"] { --accent-color: #4ade80; --block-bg: #86efac; --resizer-hover: #4ade80; --block-text: #1c1917; }
-
-        /* --- Palette 4: Amethyst Purple --- */
         [data-color="amethyst"] { --accent-color: #7c3aed; --block-bg: #8b5cf6; --resizer-hover: #7c3aed; --block-text: #ffffff; }
         [data-color="amethyst"][data-theme="dark"] { --accent-color: #c084fc; --block-bg: #d8b4fe; --resizer-hover: #c084fc; --block-text: #1c1917; }
-
 
         /* =========================================
            Globales Reset & Layout
            ========================================= */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-
-        body {
-            background-color: var(--bg-main); color: var(--text-main);
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-            transition: background-color 0.3s, color 0.3s;
-        }
-
+        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
         body.is-resizing * { user-select: none !important; pointer-events: none !important; }
         svg.icon { flex-shrink: 0; }
 
         /* Top Menüleiste */
-        .top-menu {
-            height: 45px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 10;
-        }
-        .menu-items { display: flex; gap: 20px; font-size: 14px; }
-        .menu-items span { cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; }
+        .top-menu { height: 45px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 10; }
+        .menu-items { display: flex; gap: 20px; font-size: 14px; position: relative; }
+        .menu-items span { cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; user-select: none; }
         .menu-items span:hover { color: var(--accent-color); background: var(--bg-nav); }
-        
         .header-controls { display: flex; gap: 10px; }
-        .header-btn {
-            background: none; border: 1px solid var(--border-color); color: var(--text-main);
-            padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;
-            display: flex; align-items: center; gap: 6px;
-        }
+        .header-btn { background: none; border: 1px solid var(--border-color); color: var(--text-main); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .header-btn:hover { background: var(--bg-nav); border-color: var(--accent-color); }
 
         /* Workspace Layout */
         .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
-
-        /* Resizer */
         .resizer-x { width: 8px; margin: 0 -4px; flex-shrink: 0; cursor: col-resize; position: relative; z-index: 10; }
         .resizer-x::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background-color: var(--border-color); transition: 0.2s; }
         .resizer-x:hover::after, .resizer-x:active::after { background-color: var(--resizer-hover); left: 2px; width: 4px; }
-
         .resizer-y { height: 8px; margin: -4px 0; flex-shrink: 0; cursor: row-resize; position: relative; z-index: 10; }
         .resizer-y::after { content: ''; position: absolute; left: 0; right: 0; top: 3px; height: 2px; background-color: var(--border-color); transition: 0.2s; }
         .resizer-y:hover::after, .resizer-y:active::after { background-color: var(--resizer-hover); top: 2px; height: 4px; }
@@ -103,114 +72,67 @@
         .nav-btn { background: none; border: none; padding: 10px; margin-bottom: 5px; cursor: pointer; border-radius: 8px; transition: 0.2s; display: flex; justify-content: center; align-items: center; color: var(--text-muted); }
         .nav-btn:hover { color: var(--text-main); }
         .nav-btn.active { color: var(--accent-color); }
-
-        .side-content { width: 260px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+        .side-content { width: 260px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: auto; }
         .sidebar.collapsed .side-content { display: none; }
-
-        .panel-section { display: none; flex-direction: column; width: 100%; }
+        .panel-section { display: none; flex-direction: column; width: 100%; min-width: max-content; }
         .panel-section.active { display: flex; }
-        
-        .panel-title-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-color); }
+        .panel-title-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--bg-panel); z-index: 5;}
         .panel-title { font-weight: bold; font-size: 12px; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
         .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
         .btn-icon:hover { color: var(--accent-color); }
 
+        /* Blocks Sidebar */
         .category summary { padding: 12px 15px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border-color); list-style: none; white-space: nowrap; }
         .category summary:hover { background-color: rgba(0,0,0,0.03); }
         .commands-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .command-block { background-color: var(--block-bg); color: var(--block-text); font-weight: 500; padding: 8px 12px; border-radius: 4px; cursor: grab; font-size: 13px; white-space: nowrap; }
+        .command-block { background-color: var(--block-bg); color: var(--block-text); font-weight: 500; padding: 8px 12px; border-radius: 4px; cursor: grab; font-size: 13px; white-space: nowrap; transition: 0.2s; }
+        .command-block:hover { filter: brightness(1.1); transform: scale(1.02); }
 
-        /* =========================================
-           Dateibrowser & Ordner (SVG Version)
-           ========================================= */
+        /* Dateibrowser & Ordner */
         .file-tree { padding: 10px; font-size: 14px; white-space: nowrap; user-select: none; }
         .folder summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 5px 0; }
         .folder summary::-webkit-details-marker { display: none; } 
         .folder summary:hover { color: var(--accent-color); }
-        
         .folder-icon { display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
         .folder:hover > summary > .folder-icon { color: var(--accent-color); }
-        .folder-closed { display: block; }
-        .folder-open { display: none; }
-        .folder[open] > summary .folder-closed { display: none; }
-        .folder[open] > summary .folder-open { display: block; color: var(--accent-color); }
-        
+        .folder-closed { display: block; } .folder-open { display: none; }
+        .folder[open] > summary .folder-closed { display: none; } .folder[open] > summary .folder-open { display: block; color: var(--accent-color); }
         .file-tree ul { list-style: none; margin-left: 10px; padding-left: 15px; border-left: 1px dashed var(--border-color); }
         .file-tree li { margin: 5px 0; cursor: pointer; display: flex; align-items: center; gap: 6px;}
         .file-tree li.file-item:hover { color: var(--accent-color); }
         .icon-file { color: var(--text-muted); }
         .file-item:hover .icon-file { color: var(--accent-color); }
-
         .cut-item { opacity: 0.4; border: 1px dashed var(--accent-color); padding-left: 4px; border-radius: 4px;}
 
-        /* =========================================
-           Dropdown Menüs (Kontext & View Menu)
-           ========================================= */
-        .context-menu {
-            position: absolute; display: none; background: var(--bg-panel);
-            border: 1px solid var(--border-color); border-radius: 6px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; min-width: 170px;
-        }
+        /* Dropdown Menüs */
+        .context-menu { position: absolute; display: none; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; min-width: 170px; }
         .context-menu.active { display: block; }
         .context-menu ul { list-style: none; padding: 5px 0; margin: 0; }
         .context-menu li { padding: 8px 15px; font-size: 13px; cursor: pointer; color: var(--text-main); display: flex; align-items: center; gap: 10px;}
         .context-menu li:hover { background: var(--accent-color); color: #fff; }
         .menu-divider { height: 1px; background: var(--border-color); margin: 4px 0; pointer-events: none;}
-
         .context-menu li.has-submenu { justify-content: space-between; position: relative; }
         .context-menu li.has-submenu .menu-label { display: flex; align-items: center; gap: 10px; }
-        
-        .context-menu .submenu {
-            position: absolute; left: 100%; top: -1px; display: none;
-            background: var(--bg-panel); border: 1px solid var(--border-color);
-            border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            min-width: 170px; padding: 5px 0; margin: 0;
-        }
+        .context-menu .submenu { position: absolute; left: 100%; top: -1px; display: none; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); min-width: 170px; padding: 5px 0; margin: 0; }
         .context-menu .has-submenu:hover .submenu { display: block; }
         .context-menu .has-submenu:hover { background: var(--accent-color); color: #fff; }
         .context-menu .submenu li { justify-content: flex-start; color: var(--text-main); }
         .context-menu .has-submenu:hover .submenu li { color: var(--text-main); background: var(--bg-panel); }
         .context-menu .has-submenu:hover .submenu li:hover { background: var(--accent-color); color: #fff; }
-        
         .palette-swatch { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1); }
 
-        /* =========================================
-           Modals (Prompt)
-           ========================================= */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); z-index: 10000;
-            display: none; align-items: center; justify-content: center;
-            opacity: 0; transition: opacity 0.2s;
-        }
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
         .modal-overlay.active { display: flex; opacity: 1; }
-        
-        .modal-content {
-            background: var(--bg-panel); padding: 25px; border-radius: 12px;
-            width: 320px; box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-            border: 1px solid var(--border-color); transform: translateY(-20px);
-            transition: transform 0.2s;
-        }
+        .modal-content { background: var(--bg-panel); padding: 25px; border-radius: 12px; width: 320px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: 1px solid var(--border-color); transform: translateY(-20px); transition: transform 0.2s; }
         .modal-overlay.active .modal-content { transform: translateY(0); }
-        
         .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: var(--text-main); }
-        .modal-message { font-size: 13px; margin-bottom: 15px; color: var(--text-muted); line-height: 1.4; }
-        
-        .modal-input {
-            width: 100%; padding: 10px; margin-bottom: 10px; font-size: 14px;
-            background: var(--bg-main); color: var(--text-main);
-            border: 1px solid var(--border-color); border-radius: 6px;
-            outline: none; transition: border-color 0.2s;
-        }
+        .modal-message { font-size: 13px; margin-bottom: 15px; color: var(--text-muted); line-height: 1.4; word-break: break-all; }
+        .modal-input { width: 100%; padding: 10px; margin-bottom: 10px; font-size: 14px; background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; outline: none; transition: border-color 0.2s; }
         .modal-input:focus { border-color: var(--accent-color); }
-        
         .modal-error { color: #ef4444; font-size: 12px; margin-bottom: 15px; display: none; line-height: 1.3; font-weight: 500; }
-        
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;}
-        .modal-btn {
-            padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; 
-            font-size: 13px; font-weight: 600; transition: background 0.2s;
-        }
+        .modal-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.2s; }
         .btn-cancel { background: var(--bg-nav); color: var(--text-main); }
         .btn-cancel:hover { background: var(--border-color); }
         .btn-confirm { background: var(--accent-color); color: #fff; }
@@ -218,59 +140,55 @@
         .btn-danger { background: #ef4444; color: #fff; }
         .btn-danger:hover { background: #dc2626; }
 
-        /* =========================================
-           Mitte: Tabs & Canvas
-           ========================================= */
+        /* Mitte: Tabs & Canvas */
         .main-area { flex: 1; display: flex; flex-direction: column; min-width: 150px; background-color: var(--bg-canvas); }
-        
         .editor-tabs { display: flex; background-color: var(--bg-nav); border-bottom: 1px solid var(--border-color); overflow-x: auto; overflow-y: hidden; min-height: 35px; }
         .editor-tabs.hidden { display: none; }
-        
-        .editor-tab { padding: 0 15px; display: flex; align-items: center; gap: 8px; height: 35px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); cursor: pointer; font-size: 13px; color: var(--text-muted); border-top: 2px solid transparent; user-select: none; transition: background-color 0.2s, color 0.2s; }
+        .editor-tab { padding: 0 15px; display: flex; align-items: center; gap: 8px; height: 35px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); cursor: pointer; font-size: 13px; color: var(--text-muted); border-top: 2px solid transparent; user-select: none; transition: background-color 0.2s, color 0.2s; white-space: nowrap; }
         .editor-tab:hover { background-color: var(--bg-main); color: var(--text-main); }
-        .editor-tab.active { background-color: var(--bg-canvas); color: var(--accent-color); border-top: 2px solid var(--accent-color); }
-        .editor-tab.active .icon-file { color: var(--accent-color); }
+        .editor-tab.active { background-color: var(--editor-bg); color: var(--accent-color); border-top: 2px solid var(--accent-color); }
+
+        .canvas { flex: 1; display: flex; flex-direction: column; background-image: radial-gradient(var(--border-color) 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; position: relative;}
         
-        .editor-tab.dragging { opacity: 0.4; background-color: var(--bg-main); }
-        .editor-tab.drag-over-left { box-shadow: inset 3px 0 0 var(--accent-color); }
-        .editor-tab.drag-over-right { box-shadow: inset -3px 0 0 var(--accent-color); }
-        .editor-tab > span:not(.tab-close) { pointer-events: none; }
+        /* Text Editor */
+        .code-editor { width: 100%; height: 100%; resize: none; border: none; outline: none; background-color: var(--editor-bg); color: var(--editor-text); font-family: 'Courier New', Courier, monospace; font-size: 14px; padding: 20px; line-height: 1.5; white-space: pre; overflow: auto; display: none; }
+        .block-editor { width: 100%; height: 100%; overflow: auto; padding: 20px; display: none; background-color: var(--bg-canvas); }
 
-        .tab-close { cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border-radius: 4px; padding: 2px; transition: 0.2s; }
-        .tab-close:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        /* View State Logic */
+        .canvas.mode-code.has-file { background-image: none; background-color: var(--editor-bg); }
+        .canvas.mode-code.has-file .code-editor { display: block; }
+        .canvas.mode-block .block-editor { display: flex; flex-direction: column; gap: 15px; align-items: flex-start; }
 
-        .canvas { flex: 1; background-image: radial-gradient(var(--border-color) 1px, transparent 1px); background-size: 20px 20px; }
+        /* Drag & Drop Visual Blocks */
+        .visual-block { background: var(--block-bg-color); border: 1px solid var(--block-border); border-radius: 8px; padding: 12px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 250px; transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
+        .visual-block.drag-over { border: 2px dashed var(--accent-color) !important; background-color: rgba(234, 88, 12, 0.05) !important; box-shadow: inset 0 0 0 2px var(--accent-color); }
+        .visual-block-header { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--accent-color); display: flex; align-items: center; gap: 8px; }
+        .visual-block-children { padding-left: 20px; border-left: 2px dashed var(--border-color); margin-top: 15px; display: flex; flex-direction: column; gap: 10px; min-height: 10px; }
+        .visual-block-prop { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-top: 8px; color: var(--text-main); }
+        .visual-block-prop input { background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 10px; outline: none; font-size: 13px; width: 100%; transition: border-color 0.2s; }
+        .visual-block-prop input:focus { border-color: var(--accent-color); }
 
         /* Konsole & Rechte Seite */
         .console-container { display: flex; flex-direction: column; }
         .console-header { padding: 8px 15px; background-color: var(--bg-panel); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .console-header:hover { color: var(--accent-color); }
+        .console-header-right { display: flex; align-items: center; gap: 15px; }
+        .btn-clear-console { background: var(--bg-nav); border: 1px solid var(--border-color); color: var(--text-main); font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .btn-clear-console:hover { background: var(--border-color); color: var(--accent-color); }
         .console-arrow { transition: transform 0.2s; }
         .console-container.collapsed .console-arrow { transform: rotate(180deg); }
-        
         .console-content { height: 150px; background-color: var(--console-bg); color: var(--console-text); font-family: 'Courier New', monospace; font-size: 13px; padding: 10px 15px; overflow-y: auto; }
         .console-container.collapsed .console-content { display: none; }
 
         .sidebar-right { flex-direction: row-reverse; } 
         .emulator-wrapper { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; min-width: 250px; }
-        
-        .emulator-toolbar { display: flex; gap: 6px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; max-width: 280px; }
-        .toolbar-btn { 
-            background: var(--bg-panel); border: 1px solid var(--border-color); color: var(--text-main); 
-            cursor: pointer; width: 32px; height: 32px; border-radius: 6px; 
-            display: flex; align-items: center; justify-content: center; transition: 0.2s;
-        }
-        /* ICONS KLEINER IM EMULATOR */
-        .toolbar-btn svg { width: 16px; height: 16px; }
-        .toolbar-btn:hover { color: var(--accent-color); border-color: var(--accent-color); background: var(--bg-nav); }
-
         .phone-emulator { width: 100%; max-width: 280px; aspect-ratio: 9/19; background-color: var(--device-frame); border-radius: 30px; padding: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
-        .phone-screen { width: 100%; height: 100%; background-color: #fff; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #000; }
+        .phone-screen { width: 100%; height: 100%; background-color: #fff; border-radius: 20px; display: flex; flex-direction: column; color: #000; overflow: hidden; position: relative;}
     </style>
 </head>
 <body>
 
-    <!-- Eigenes Modal / Pop-up für Eingaben -->
+    <!-- Eigenes Modal -->
     <div class="modal-overlay" id="customModal">
         <div class="modal-content">
             <div class="modal-title" id="modalTitle">Titel</div>
@@ -284,117 +202,59 @@
         </div>
     </div>
 
-    <!-- Dropdown-Menü für das Plus-Icon (+) -->
+    <!-- Dropdown für "Datei" -->
+    <div class="context-menu" id="fileMenuDropdown">
+        <ul><li onclick="loadDefaultProject()"><span data-i18n="menu_file_load_default">Neues Projekt (Standard)</span></li></ul>
+    </div>
+
+    <!-- Dropdown-Menü für das Plus-Icon (+) im Dateibrowser -->
     <div class="context-menu" id="createMenu">
         <ul>
-            <li onclick="startCreate('file', '.app')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                <span data-i18n="ctx_new_app">Neue .app Datei</span>
-            </li>
-            <li onclick="startCreate('file', '.css')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                <span data-i18n="ctx_new_css">Neue .css Datei</span>
-            </li>
-            <li onclick="startCreate('file', '.js')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                <span data-i18n="ctx_new_js">Neue .js Datei</span>
-            </li>
+            <li onclick="startCreate('file', '.app')"><span data-i18n="ctx_new_app">Neue .app Datei</span></li>
+            <li onclick="startCreate('file', '.kt')"><span>Neue .kt Datei</span></li>
+            <li onclick="startCreate('file', '.xml')"><span>Neue .xml Datei</span></li>
             <div class="menu-divider"></div>
-            <li onclick="startCreate('folder', '')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span data-i18n="ctx_new_folder">Neuer Ordner</span>
-            </li>
+            <li onclick="startCreate('folder', '')"><span data-i18n="ctx_new_folder">Neuer Ordner</span></li>
         </ul>
     </div>
 
-    <!-- Erweitertes Kontextmenü (Rechtsklick) mit Submenü -->
+    <!-- Erweitertes Kontextmenü (Rechtsklick Dateibrowser) -->
     <div class="context-menu" id="contextMenu">
         <ul>
             <li class="has-submenu">
-                <div class="menu-label">
-                    <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    <span data-i18n="ctx_add">Hinzufügen</span>
-                </div>
-                <svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                
+                <div class="menu-label"><span data-i18n="ctx_add">Hinzufügen</span></div>
                 <ul class="submenu">
-                    <li onclick="handleCtxAction('new_app')">
-                        <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        <span data-i18n="ctx_new_app">Neue .app Datei</span>
-                    </li>
-                    <li onclick="handleCtxAction('new_css')">
-                        <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        <span data-i18n="ctx_new_css">Neue .css Datei</span>
-                    </li>
-                    <li onclick="handleCtxAction('new_js')">
-                        <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        <span data-i18n="ctx_new_js">Neue .js Datei</span>
-                    </li>
+                    <li onclick="handleCtxAction('new_app')"><span data-i18n="ctx_new_app">Neue .app Datei</span></li>
+                    <li onclick="handleCtxAction('new_kt')"><span>Neue .kt Datei</span></li>
+                    <li onclick="handleCtxAction('new_xml')"><span>Neue .xml Datei</span></li>
                     <div class="menu-divider"></div>
-                    <li onclick="handleCtxAction('new_folder')">
-                        <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                        <span data-i18n="ctx_new_folder">Neuer Ordner</span>
-                    </li>
+                    <li onclick="handleCtxAction('new_folder')"><span data-i18n="ctx_new_folder">Neuer Ordner</span></li>
                 </ul>
             </li>
-            
             <div class="menu-divider"></div>
-            <li onclick="handleCtxAction('copy')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span data-i18n="ctx_copy">Kopieren</span>
-            </li>
-            <li onclick="handleCtxAction('cut')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
-                <span data-i18n="ctx_cut">Ausschneiden</span>
-            </li>
-            <li onclick="handleCtxAction('paste')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                <span data-i18n="ctx_paste">Einfügen</span>
-            </li>
+            <li onclick="handleCtxAction('copy')"><span data-i18n="ctx_copy">Kopieren</span></li>
+            <li onclick="handleCtxAction('cut')"><span data-i18n="ctx_cut">Ausschneiden</span></li>
+            <li onclick="handleCtxAction('paste')"><span data-i18n="ctx_paste">Einfügen</span></li>
             <div class="menu-divider"></div>
-            <li onclick="handleCtxAction('rename')">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                <span data-i18n="ctx_rename">Umbenennen</span>
-            </li>
-            <li onclick="handleCtxAction('delete')" style="color: #ef4444;">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                <span data-i18n="ctx_delete">Löschen</span>
-            </li>
+            <li onclick="handleCtxAction('rename')"><span data-i18n="ctx_rename">Umbenennen</span></li>
+            <li onclick="handleCtxAction('delete')" style="color: #ef4444;"><span data-i18n="ctx_delete">Löschen</span></li>
         </ul>
     </div>
 
-    <!-- Dropdown-Menü für "Ansicht" in der Top-Bar (Mit Paletten Submenü) -->
+    <!-- Dropdown-Menü für "Ansicht" -->
     <div class="context-menu" id="viewMenu">
         <ul>
-            <li onclick="toggleTheme()">
-                <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                <span data-i18n="menu_view_theme">Dark / Light Mode wechseln</span>
-            </li>
-            
+            <li onclick="setEditorMode('block')"><span data-i18n="menu_view_block">Block-Editor (Visuell)</span></li>
+            <li onclick="setEditorMode('code')"><span data-i18n="menu_view_code">Text-Editor (Code)</span></li>
+            <div class="menu-divider"></div>
+            <li onclick="toggleTheme()"><span data-i18n="menu_view_theme">Dark / Light Mode wechseln</span></li>
             <li class="has-submenu">
-                <div class="menu-label">
-                    <svg class="icon" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"></circle><circle cx="17.5" cy="10.5" r=".5"></circle><circle cx="8.5" cy="7.5" r=".5"></circle><circle cx="6.5" cy="12.5" r=".5"></circle><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.92-.81 1.99-1.85.03-.43-.13-.85-.45-1.16-.36-.36-.61-.85-.64-1.39-.06-1.12.82-2.11 1.94-2.2l.33-.03c3.08-.27 5.56-2.82 5.8-5.91C21.36 6.07 17.26 2 12 2z"></path></svg>
-                    <span data-i18n="menu_view_palette">Farbpalette wählen...</span>
-                </div>
-                <svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                
+                <div class="menu-label"><span data-i18n="menu_view_palette">Farbpalette wählen...</span></div>
                 <ul class="submenu">
-                    <li onclick="applyColorPalette('sunset')">
-                        <span class="palette-swatch" style="background-color: #ea580c;"></span>
-                        <span data-i18n="color_sunset">Sunset Orange</span>
-                    </li>
-                    <li onclick="applyColorPalette('ocean')">
-                        <span class="palette-swatch" style="background-color: #0284c7;"></span>
-                        <span data-i18n="color_ocean">Ocean Blue</span>
-                    </li>
-                    <li onclick="applyColorPalette('emerald')">
-                        <span class="palette-swatch" style="background-color: #059669;"></span>
-                        <span data-i18n="color_emerald">Emerald Green</span>
-                    </li>
-                    <li onclick="applyColorPalette('amethyst')">
-                        <span class="palette-swatch" style="background-color: #7c3aed;"></span>
-                        <span data-i18n="color_amethyst">Amethyst Purple</span>
-                    </li>
+                    <li onclick="applyColorPalette('sunset')"><span data-i18n="color_sunset">Sunset Orange</span></li>
+                    <li onclick="applyColorPalette('ocean')"><span data-i18n="color_ocean">Ocean Blue</span></li>
+                    <li onclick="applyColorPalette('emerald')"><span data-i18n="color_emerald">Emerald Green</span></li>
+                    <li onclick="applyColorPalette('amethyst')"><span data-i18n="color_amethyst">Amethyst Purple</span></li>
                 </ul>
             </li>
         </ul>
@@ -402,94 +262,61 @@
 
     <header class="top-menu">
         <div class="menu-items">
-            <span data-i18n="menu_file">Datei</span>
-            <span data-i18n="menu_edit">Bearbeiten</span>
+            <span data-i18n="menu_file" onclick="showFileMenu(event)">Datei</span>
             <span data-i18n="menu_view" onclick="showViewMenu(event)">Ansicht</span>
-            <span data-i18n="menu_run">Ausführen</span>
+            <span data-i18n="menu_run" onclick="printCodeToConsole()">Ausführen (Build)</span>
         </div>
         <div class="header-controls">
-            <!-- Language Toggle Button -->
-            <button class="header-btn" id="lang-toggle-btn" onclick="toggleLanguage()">
-                <svg viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                <span id="lang-text">DE</span>
-            </button>
+            <button class="header-btn" id="lang-toggle-btn" onclick="toggleLanguage()"><span id="lang-text">DE</span></button>
         </div>
     </header>
 
     <main class="workspace">
         <aside class="sidebar" id="sidebarLeft">
             <div class="side-nav">
-                <button class="nav-btn active" id="btn-blocks" onclick="toggleLeftPanel('blocks')" title="Befehle">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><path d="M3 14h7v7H3z"></path></svg>
-                </button>
-                <button class="nav-btn" id="btn-files" onclick="toggleLeftPanel('files')" title="Dateibrowser">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                </button>
+                <button class="nav-btn active" id="btn-blocks" onclick="toggleLeftPanel('blocks')" title="Befehle"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><path d="M3 14h7v7H3z"></path></svg></button>
+                <button class="nav-btn" id="btn-files" onclick="toggleLeftPanel('files')" title="Dateibrowser"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
             </div>
             
             <div class="side-content" id="contentLeft">
                 <div class="panel-section active" id="panel-blocks">
-                    <div class="panel-title-bar">
-                        <span class="panel-title" data-i18n="panel_blocks">Elemente & Befehle</span>
-                    </div>
-                    <details class="category" open><summary data-i18n="cat_control">Steuerung</summary>
+                    <div class="panel-title-bar"><span class="panel-title" data-i18n="panel_blocks">UI Elemente (Drag)</span></div>
+                    <details class="category" open><summary data-i18n="cat_control">Container & Layout</summary>
                         <div class="commands-list">
-                            <div class="command-block" data-i18n="block_start">Wenn [Start] geklickt</div>
-                            <div class="command-block" data-i18n="block_repeat">Wiederhole 10 mal</div>
+                            <div class="command-block" draggable="true" data-type="Scaffold" ondragstart="handleDragStartSidebar(event)" data-i18n="block_scaffold">Scaffold Container</div>
+                            <div class="command-block" draggable="true" data-type="Greeting" ondragstart="handleDragStartSidebar(event)" data-i18n="block_greeting">Text (Greeting)</div>
                         </div>
-                    </details>
-                    <details class="category"><summary data-i18n="cat_design">Design</summary>
-                        <div class="commands-list"><div class="command-block" style="background: var(--accent-color); color: var(--block-text);" data-i18n="block_bg">Hintergrund Rot</div></div>
                     </details>
                 </div>
                 
                 <div class="panel-section" id="panel-files">
                     <div class="panel-title-bar">
                         <span class="panel-title" data-i18n="panel_files">Projektdateien</span>
-                        <button class="btn-icon" onclick="showCreateMenu(event)" title="Hinzufügen">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        </button>
+                        <button class="btn-icon" onclick="showCreateMenu(event)" title="Hinzufügen"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
                     </div>
-                    
-                    <div class="file-tree" id="fileTree">
-                        <details class="folder" open>
-                            <summary>
-                                <span class="folder-icon">
-                                    <svg class="folder-closed" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                                    <svg class="folder-open" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2h-8l-2-2H4c-1.1 0-2 .9-2 2z"></path><path d="M2 11h20"></path></svg>
-                                </span> 
-                                <span class="item-name">src</span>
-                            </summary>
-                            <ul id="src-folder">
-                                <li class="file-item" data-name="main.app" onclick="openFile('main.app')">
-                                    <svg class="icon icon-file" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                                    <span class="item-name">main.app</span>
-                                </li>
-                                <li class="file-item" data-name="style.css" onclick="openFile('style.css')">
-                                    <svg class="icon icon-file" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                                    <span class="item-name">style.css</span>
-                                </li>
-                            </ul>
-                        </details>
-                    </div>
+                    <div class="file-tree" id="fileTree"><div style="padding: 15px; color: var(--text-muted); font-size: 12px; white-space: normal;" data-i18n="tree_empty">Kein Projekt geladen.</div></div>
                 </div>
             </div>
         </aside>
+        
         <div class="resizer-x" id="resizerLeft"></div>
 
         <div class="main-area">
             <div class="editor-tabs hidden" id="editorTabs"></div>
-            <div class="canvas"></div>
+            <div class="canvas mode-code" id="mainCanvas">
+                <textarea class="code-editor" id="codeEditor" spellcheck="false"></textarea>
+                <div class="block-editor" id="blockEditor"></div>
+            </div>
             <div class="resizer-y" id="resizerBottom"></div>
-            
             <div class="console-container" id="consolePanel">
                 <div class="console-header" onclick="toggleConsole()">
-                    <span data-i18n="terminal_title">Terminal / Errors</span>
-                    <svg class="console-arrow" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    <span data-i18n="terminal_title">Terminal / Logs</span>
+                    <div class="console-header-right">
+                        <button class="btn-clear-console" onclick="clearConsole(event)" data-i18n="btn_clear">Leeren</button>
+                        <svg class="console-arrow" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
                 </div>
-                <div class="console-content" id="consoleContent">
-                    <p data-i18n="terminal_ready">> System bereit...</p>
-                </div>
+                <div class="console-content" id="consoleContent"><p data-i18n="terminal_ready">> System bereit.</p></div>
             </div>
         </div>
 
@@ -497,577 +324,23 @@
 
         <aside class="sidebar sidebar-right" id="sidebarRight">
             <div class="side-nav">
-                <!-- Icon Emulator -->
-                <button class="nav-btn active" id="btn-emulator" onclick="toggleRightPanel()" title="Emulator">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                </button>
+                <button class="nav-btn active" id="btn-emulator" onclick="toggleRightPanel()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect></svg></button>
             </div>
             <div class="side-content" id="contentRight">
                 <div class="panel-title-bar"><span class="panel-title" data-i18n="emulator_title">Live Emulator</span></div>
                 <div class="emulator-wrapper">
-                    <div class="emulator-toolbar">
-                        <button class="toolbar-btn" data-i18n-title="btn_power" title="An/Aus">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_voldown" title="Leiser">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="15" y1="9" x2="15" y2="15"></line></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_volup" title="Lauter">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_rot_l" title="Drehen Links">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_rot_r" title="Drehen Rechts">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_back" title="Zurück">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_home" title="Home (Mitte)">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_keyboard" title="Tastatur">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6.01" y2="8"></line><line x1="10" y1="8" x2="10.01" y2="8"></line><line x1="14" y1="8" x2="14.01" y2="8"></line><line x1="18" y1="8" x2="18.01" y2="8"></line><line x1="6" y1="12" x2="6.01" y2="12"></line><line x1="10" y1="12" x2="10.01" y2="12"></line><line x1="14" y1="12" x2="14.01" y2="12"></line><line x1="18" y1="12" x2="18.01" y2="12"></line><line x1="7" y1="16" x2="17" y2="16"></line></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_upload" title="Upload">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                        </button>
-                        <button class="toolbar-btn" data-i18n-title="btn_download" title="Download">
-                            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        </button>
-                    </div>
-                    <div class="phone-emulator"><div class="phone-screen" data-i18n="app_preview">App Preview</div></div>
+                    <div class="phone-emulator"><div class="phone-screen" id="phoneScreen">App Preview</div></div>
                 </div>
             </div>
         </aside>
-
     </main>
 
-    <script>
-        // --- SVG STRINGS FÜR JS GENERIERUNG ---
-        const SVG_FILE = `<svg class="icon icon-file" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
-        const SVG_FOLDER_CLOSED = `<svg class="folder-closed" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-        const SVG_FOLDER_OPEN = `<svg class="folder-open" viewBox="0 0 24 24" width="1.2em" height="1.2em" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2h-8l-2-2H4c-1.1 0-2 .9-2 2z"></path><path d="M2 11h20"></path></svg>`;
-        const SVG_CLOSE = `<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    <!-- JS DATEIEN EINBINDEN -->
+    <script src="js/state.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/vfs.js"></script>
+    <script src="js/main.js"></script>
 
-        // --- TRANSLATION LOGIK ---
-        const dictionary = {
-            'menu_file': { de: 'Datei', en: 'File' }, 'menu_edit': { de: 'Bearbeiten', en: 'Edit' },
-            'menu_view': { de: 'Ansicht', en: 'View' }, 'menu_run': { de: 'Ausführen', en: 'Run' },
-            'menu_view_theme': { de: 'Dark / Light Mode wechseln', en: 'Toggle Dark / Light Mode' },
-            'menu_view_palette': { de: 'Farbpalette wählen...', en: 'Choose Color Palette...' },
-            
-            'panel_blocks': { de: 'Elemente & Befehle', en: 'Elements & Commands' },
-            'panel_files': { de: 'Projektdateien', en: 'Project Files' },
-            'cat_control': { de: 'Steuerung', en: 'Control' }, 'cat_design': { de: 'Design', en: 'Design' },
-            'block_start': { de: 'Wenn [Start] geklickt', en: 'When [Start] clicked' },
-            'block_repeat': { de: 'Wiederhole 10 mal', en: 'Repeat 10 times' },
-            'block_bg': { de: 'Hintergrund Rot', en: 'Background Red' },
-            'terminal_title': { de: 'Terminal / Errors', en: 'Terminal / Errors' },
-            'terminal_ready': { de: '> System bereit...', en: '> System ready...' },
-            'emulator_title': { de: 'Live Emulator', en: 'Live Emulator' },
-            'app_preview': { de: 'App Preview', en: 'App Preview' },
-            
-            // Kontextmenü & Modal & Validation
-            'ctx_new': { de: 'Erstellen', en: 'Create' },
-            'ctx_add': { de: 'Hinzufügen', en: 'Add' },
-            'ctx_new_app': { de: 'Neue .app Datei', en: 'New .app File' },
-            'ctx_new_css': { de: 'Neue .css Datei', en: 'New .css File' },
-            'ctx_new_js': { de: 'Neue .js Datei', en: 'New .js File' },
-            'ctx_new_folder': { de: 'Neuer Ordner', en: 'New Folder' },
-            'ctx_rename': { de: 'Umbenennen', en: 'Rename' },
-            'ctx_delete': { de: 'Löschen', en: 'Delete' },
-            'ctx_copy': { de: 'Kopieren', en: 'Copy' },
-            'ctx_cut': { de: 'Ausschneiden', en: 'Cut' },
-            'ctx_paste': { de: 'Einfügen', en: 'Paste' },
-            
-            'prompt_new': { de: 'Bitte Dateinamen eingeben:', en: 'Please enter file name:' },
-            'prompt_new_folder': { de: 'Bitte Ordnernamen eingeben:', en: 'Please enter folder name:' },
-            'prompt_rename': { de: 'Neuer Name:', en: 'New name:' },
-            'prompt_delete': { de: 'Möchtest du dieses Element wirklich löschen: ', en: 'Do you really want to delete: ' },
-            'btn_cancel': { de: 'Abbrechen', en: 'Cancel' },
-            'btn_ok': { de: 'OK', en: 'OK' },
-            'err_empty_name': { de: 'Der Name darf nicht leer sein.', en: 'Name cannot be empty.' },
-            'err_invalid_name': { de: 'Punkte (.) und Sonderzeichen sind nicht erlaubt.', en: 'Dots (.) and special characters are not allowed.' },
-            
-            // Paletten
-            'palette_title': { de: 'Farbpalette wählen', en: 'Choose Color Palette' },
-            'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
-            'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
-            'color_emerald': { de: 'Emerald Green', en: 'Emerald Green' },
-            'color_amethyst': { de: 'Amethyst Purple', en: 'Amethyst Purple' },
-
-            // Emulator Buttons
-            'btn_power': { de: 'An/Aus', en: 'Power' },
-            'btn_voldown': { de: 'Leiser', en: 'Volume Down' },
-            'btn_volup': { de: 'Lauter', en: 'Volume Up' },
-            'btn_rot_l': { de: 'Drehen Links', en: 'Rotate Left' },
-            'btn_rot_r': { de: 'Drehen Rechts', en: 'Rotate Right' },
-            'btn_back': { de: 'Zurück', en: 'Back' },
-            'btn_home': { de: 'Home (Mitte)', en: 'Home (Center)' },
-            'btn_keyboard': { de: 'Tastatur', en: 'Keyboard' },
-            'btn_upload': { de: 'Upload', en: 'Upload' },
-            'btn_download': { de: 'Download', en: 'Download' }
-        };
-        
-        let currentLang = 'de';
-        function toggleLanguage() {
-            currentLang = currentLang === 'de' ? 'en' : 'de';
-            document.getElementById('lang-text').textContent = currentLang === 'de' ? 'DE' : 'EN';
-            
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                if (dictionary[el.getAttribute('data-i18n')]) {
-                    el.textContent = dictionary[el.getAttribute('data-i18n')][currentLang];
-                }
-            });
-
-            document.querySelectorAll('[data-i18n-title]').forEach(el => {
-                if (dictionary[el.getAttribute('data-i18n-title')]) {
-                    el.title = dictionary[el.getAttribute('data-i18n-title')][currentLang];
-                }
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('lang-text').textContent = currentLang === 'de' ? 'DE' : 'EN';
-        });
-
-        // --- VALIDIERUNG VON NAMEN ---
-        function validateName(name) {
-            if (!name || name.trim() === '') return 'err_empty_name';
-            const forbiddenChars = /[\\/:\*\?"<>\|.]/;
-            if (forbiddenChars.test(name)) return 'err_invalid_name';
-            return null; 
-        }
-
-        // --- CUSTOM MODAL SYSTEM ---
-        function openModal(options) {
-            return new Promise((resolve) => {
-                const overlay = document.getElementById('customModal');
-                const titleEl = document.getElementById('modalTitle');
-                const msgEl = document.getElementById('modalMessage');
-                const inputEl = document.getElementById('modalInput');
-                const errorEl = document.getElementById('modalError');
-                const btnCancel = document.getElementById('modalBtnCancel');
-                const btnConfirm = document.getElementById('modalBtnConfirm');
-
-                titleEl.textContent = options.title || '';
-                msgEl.textContent = options.message || '';
-                btnCancel.textContent = dictionary['btn_cancel'][currentLang];
-                btnConfirm.textContent = dictionary['btn_ok'][currentLang];
-                errorEl.style.display = 'none';
-                errorEl.textContent = '';
-
-                if (options.type === 'prompt') {
-                    inputEl.style.display = 'block';
-                    inputEl.value = options.defaultValue || '';
-                    setTimeout(() => inputEl.focus(), 100);
-                } else {
-                    inputEl.style.display = 'none';
-                }
-
-                if (options.danger) {
-                    btnConfirm.classList.remove('btn-confirm');
-                    btnConfirm.classList.add('btn-danger');
-                } else {
-                    btnConfirm.classList.remove('btn-danger');
-                    btnConfirm.classList.add('btn-confirm');
-                }
-
-                overlay.classList.add('active');
-
-                function cleanup() {
-                    overlay.classList.remove('active');
-                    btnConfirm.removeEventListener('click', onConfirm);
-                    btnCancel.removeEventListener('click', onCancel);
-                    inputEl.removeEventListener('keydown', onKey);
-                    inputEl.removeEventListener('input', onInput);
-                }
-
-                function onInput() { errorEl.style.display = 'none'; }
-
-                function onConfirm() {
-                    let val = options.type === 'prompt' ? inputEl.value.trim() : true;
-                    if (options.type === 'prompt' && options.validate) {
-                        let errorKey = options.validate(val);
-                        if (errorKey) {
-                            errorEl.textContent = dictionary[errorKey][currentLang];
-                            errorEl.style.display = 'block';
-                            inputEl.focus();
-                            return; 
-                        }
-                    }
-                    cleanup(); resolve(val);
-                }
-
-                function onCancel() { cleanup(); resolve(null); }
-                function onKey(e) {
-                    if (e.key === 'Enter') onConfirm();
-                    if (e.key === 'Escape') onCancel();
-                }
-
-                btnConfirm.addEventListener('click', onConfirm);
-                btnCancel.addEventListener('click', onCancel);
-                inputEl.addEventListener('keydown', onKey);
-                inputEl.addEventListener('input', onInput);
-            });
-        }
-
-        // --- MENÜ LOGIK & KLICK OUTSIDE ---
-        const contextMenu = document.getElementById('contextMenu');
-        const createMenu = document.getElementById('createMenu');
-        const viewMenu = document.getElementById('viewMenu');
-        let currentContextTarget = null; 
-
-        function showCreateMenu(e) {
-            e.stopPropagation();
-            const rect = e.target.getBoundingClientRect();
-            createMenu.style.left = rect.left + 'px';
-            createMenu.style.top = (rect.bottom + 5) + 'px';
-            createMenu.classList.add('active');
-            contextMenu.classList.remove('active');
-            viewMenu.classList.remove('active');
-        }
-
-        function showViewMenu(e) {
-            e.stopPropagation();
-            const rect = e.target.getBoundingClientRect();
-            viewMenu.style.left = rect.left + 'px';
-            viewMenu.style.top = (rect.bottom + 10) + 'px';
-            viewMenu.classList.add('active');
-            contextMenu.classList.remove('active');
-            createMenu.classList.remove('active');
-        }
-
-        document.getElementById('fileTree').addEventListener('contextmenu', (e) => {
-            const item = e.target.closest('.file-item, .folder summary');
-            if (item) {
-                e.preventDefault(); 
-                currentContextTarget = item;
-                contextMenu.style.left = e.pageX + 'px';
-                contextMenu.style.top = e.pageY + 'px';
-                contextMenu.classList.add('active');
-                createMenu.classList.remove('active');
-                viewMenu.classList.remove('active');
-            }
-        });
-
-        document.addEventListener('click', () => {
-            contextMenu.classList.remove('active');
-            createMenu.classList.remove('active');
-            viewMenu.classList.remove('active');
-        });
-
-        // --- THEME & COLOR PALETTE LOGIK ---
-        function toggleTheme() { 
-            const htmlTag = document.documentElement; 
-            htmlTag.setAttribute('data-theme', htmlTag.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); 
-            viewMenu.classList.remove('active');
-        }
-
-        function applyColorPalette(colorName) {
-            document.documentElement.setAttribute('data-color', colorName);
-            viewMenu.classList.remove('active');
-        }
-
-        // --- FILE SYSTEM (CREATE, RENAME, DELETE, CLIPBOARD) ---
-        let clipboard = null; 
-
-        function startCreate(type, extension) {
-            const defaultTarget = document.getElementById('src-folder');
-            performCreate(type, extension, defaultTarget);
-        }
-
-        async function performCreate(type, extension, targetUl) {
-            let msg = type === 'folder' 
-                ? dictionary['prompt_new_folder'][currentLang] 
-                : dictionary['prompt_new'][currentLang] + ` (Endung: ${extension})`;
-                
-            let name = await openModal({
-                title: dictionary['ctx_new'][currentLang],
-                message: msg,
-                type: 'prompt',
-                validate: validateName
-            });
-            
-            if (name !== null) {
-                let finalName = type === 'folder' ? name : name + extension;
-                
-                if (type === 'folder') {
-                    const details = document.createElement('details');
-                    details.className = 'folder';
-                    details.open = true;
-                    details.innerHTML = `<summary><span class="folder-icon">${SVG_FOLDER_CLOSED}${SVG_FOLDER_OPEN}</span> <span class="item-name">${finalName}</span></summary><ul></ul>`;
-                    targetUl.appendChild(details);
-                } else {
-                    const li = document.createElement('li');
-                    li.className = 'file-item';
-                    li.setAttribute('data-name', finalName);
-                    li.onclick = () => openFile(finalName);
-                    li.innerHTML = `${SVG_FILE} <span class="item-name">${finalName}</span>`;
-                    targetUl.appendChild(li);
-                }
-            }
-        }
-
-        async function handleCtxAction(action) {
-            if (!currentContextTarget) return;
-            
-            let isFolder = currentContextTarget.tagName.toLowerCase() === 'summary';
-            let nameSpan = currentContextTarget.querySelector('.item-name');
-            let fullName = nameSpan.textContent;
-            let nodeContainer = isFolder ? currentContextTarget.parentElement : currentContextTarget;
-            let targetUl = isFolder ? currentContextTarget.nextElementSibling : currentContextTarget.parentElement;
-
-            if (action.startsWith('new_')) {
-                let type = action === 'new_folder' ? 'folder' : 'file';
-                let ext = action === 'new_app' ? '.app' : action === 'new_css' ? '.css' : action === 'new_js' ? '.js' : '';
-                await performCreate(type, ext, targetUl);
-            }
-            else if (action === 'rename') {
-                let baseName = fullName;
-                let extension = "";
-                if (!isFolder) {
-                    const lastDot = fullName.lastIndexOf('.');
-                    if(lastDot > 0) {
-                        baseName = fullName.substring(0, lastDot);
-                        extension = fullName.substring(lastDot);
-                    }
-                }
-                
-                let newBaseName = await openModal({
-                    title: dictionary['ctx_rename'][currentLang],
-                    message: dictionary['prompt_rename'][currentLang] + (isFolder ? '' : ` (Endung ${extension} bleibt fest)`),
-                    type: 'prompt',
-                    defaultValue: baseName,
-                    validate: validateName
-                });
-
-                if (newBaseName !== null && newBaseName !== baseName) {
-                    let finalNewName = newBaseName + extension;
-                    nameSpan.textContent = finalNewName;
-                    
-                    if (!isFolder) {
-                        currentContextTarget.setAttribute('data-name', finalNewName);
-                        currentContextTarget.onclick = () => openFile(finalNewName);
-                        
-                        let tabIndex = openFiles.indexOf(fullName);
-                        if (tabIndex > -1) {
-                            openFiles[tabIndex] = finalNewName;
-                            if (activeFile === fullName) activeFile = finalNewName;
-                            renderTabs();
-                        }
-                    }
-                }
-            } 
-            else if (action === 'delete') {
-                let confirmed = await openModal({
-                    title: dictionary['ctx_delete'][currentLang],
-                    message: dictionary['prompt_delete'][currentLang] + "'" + fullName + "'?",
-                    type: 'confirm',
-                    danger: true 
-                });
-
-                if (confirmed) {
-                    nodeContainer.remove();
-                    if (!isFolder && openFiles.includes(fullName)) {
-                        openFiles = openFiles.filter(f => f !== fullName);
-                        if (activeFile === fullName) activeFile = openFiles.length > 0 ? openFiles[openFiles.length - 1] : null;
-                        renderTabs();
-                    }
-                }
-            }
-            else if (action === 'copy' || action === 'cut') {
-                document.querySelectorAll('.cut-item').forEach(el => el.classList.remove('cut-item'));
-                clipboard = { action: action, node: nodeContainer, isFolder: isFolder };
-                if (action === 'cut') nodeContainer.classList.add('cut-item');
-            }
-            else if (action === 'paste') {
-                if (!clipboard || !clipboard.node) return;
-                
-                if (clipboard.action === 'cut') {
-                    targetUl.appendChild(clipboard.node);
-                    clipboard.node.classList.remove('cut-item');
-                    clipboard = null; 
-                } 
-                else if (clipboard.action === 'copy') {
-                    let clone = clipboard.node.cloneNode(true);
-                    let cloneNameSpan = clone.querySelector(clipboard.isFolder ? 'summary .item-name' : '.item-name');
-                    let oldName = cloneNameSpan.textContent;
-                    let newName = oldName;
-
-                    if (clipboard.isFolder) {
-                        newName = oldName + "_kopie";
-                    } else {
-                        let dotIdx = oldName.lastIndexOf('.');
-                        if(dotIdx > 0) {
-                            newName = oldName.substring(0, dotIdx) + "_kopie" + oldName.substring(dotIdx);
-                        } else {
-                            newName = oldName + "_kopie";
-                        }
-                        clone.setAttribute('data-name', newName);
-                        clone.onclick = () => openFile(newName);
-                    }
-                    cloneNameSpan.textContent = newName;
-                    targetUl.appendChild(clone);
-                }
-            }
-            currentContextTarget = null;
-        }
-
-        // --- EDITOR TABS & DRAG AND DROP LOGIK ---
-        let openFiles = [];
-        let activeFile = null;
-        let dragStartIndex = -1; 
-        const tabsContainer = document.getElementById('editorTabs');
-
-        tabsContainer.addEventListener('dragover', (e) => {
-            e.preventDefault(); 
-            if (e.target === tabsContainer) {
-                const tabs = tabsContainer.querySelectorAll('.editor-tab');
-                if (tabs.length > 0) {
-                    tabs.forEach(t => t.classList.remove('drag-over-left', 'drag-over-right'));
-                    tabs[tabs.length - 1].classList.add('drag-over-right');
-                }
-            }
-        });
-
-        tabsContainer.addEventListener('dragleave', (e) => {
-            if (e.target === tabsContainer) {
-                const tabs = tabsContainer.querySelectorAll('.editor-tab');
-                if (tabs.length > 0) tabs[tabs.length - 1].classList.remove('drag-over-right');
-            }
-        });
-
-        tabsContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (e.target === tabsContainer && dragStartIndex !== -1) {
-                const draggedItem = openFiles.splice(dragStartIndex, 1)[0];
-                openFiles.push(draggedItem);
-                dragStartIndex = -1;
-                renderTabs();
-            }
-            tabsContainer.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('drag-over-left', 'drag-over-right'));
-        });
-
-        function openFile(fileName) {
-            if (!openFiles.includes(fileName)) openFiles.push(fileName);
-            activeFile = fileName; renderTabs();
-        }
-
-        function closeFile(fileName, event) {
-            event.stopPropagation();
-            openFiles = openFiles.filter(f => f !== fileName);
-            if (activeFile === fileName) activeFile = openFiles.length > 0 ? openFiles[openFiles.length - 1] : null;
-            renderTabs();
-        }
-
-        function switchTab(fileName) { activeFile = fileName; renderTabs(); }
-
-        function renderTabs() {
-            if (openFiles.length === 0) { tabsContainer.classList.add('hidden'); tabsContainer.innerHTML = ''; return; }
-            tabsContainer.classList.remove('hidden');
-            tabsContainer.innerHTML = openFiles.map((f, index) => `
-                <div class="editor-tab ${f === activeFile ? 'active' : ''}" 
-                     draggable="true" data-index="${index}" onclick="switchTab('${f}')">
-                    ${SVG_FILE} <span>${f}</span>
-                    <span class="tab-close" onclick="closeFile('${f}', event)">
-                        ${SVG_CLOSE}
-                    </span>
-                </div>
-            `).join('');
-
-            const tabElements = tabsContainer.querySelectorAll('.editor-tab');
-            tabElements.forEach(tab => {
-                tab.addEventListener('dragstart', handleDragStart);
-                tab.addEventListener('dragover', handleDragOverTab);
-                tab.addEventListener('dragleave', handleDragLeaveTab);
-                tab.addEventListener('drop', handleDropTab);
-                tab.addEventListener('dragend', handleDragEnd);
-            });
-        }
-
-        function handleDragStart(e) {
-            dragStartIndex = +e.currentTarget.getAttribute('data-index');
-            e.currentTarget.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', dragStartIndex); 
-            e.dataTransfer.effectAllowed = 'move';
-        }
-
-        function handleDragOverTab(e) {
-            e.preventDefault(); e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            const midPoint = rect.left + rect.width / 2;
-            e.currentTarget.classList.remove('drag-over-left', 'drag-over-right');
-            if (e.clientX < midPoint) e.currentTarget.classList.add('drag-over-left');
-            else e.currentTarget.classList.add('drag-over-right');
-        }
-
-        function handleDragLeaveTab(e) { e.currentTarget.classList.remove('drag-over-left', 'drag-over-right'); }
-
-        function handleDropTab(e) {
-            e.preventDefault(); e.stopPropagation();
-            e.currentTarget.classList.remove('drag-over-left', 'drag-over-right');
-            const targetIndex = +e.currentTarget.getAttribute('data-index');
-            const rect = e.currentTarget.getBoundingClientRect();
-            const midPoint = rect.left + rect.width / 2;
-            const isAfter = e.clientX >= midPoint;
-            
-            if (dragStartIndex !== -1) {
-                let insertIndex = isAfter ? targetIndex + 1 : targetIndex;
-                if (dragStartIndex < insertIndex) insertIndex--;
-                
-                if (dragStartIndex !== insertIndex) {
-                    const draggedItem = openFiles.splice(dragStartIndex, 1)[0];
-                    openFiles.splice(insertIndex, 0, draggedItem);
-                    renderTabs();
-                }
-            }
-            dragStartIndex = -1;
-        }
-
-        function handleDragEnd(e) {
-            e.currentTarget.classList.remove('dragging');
-            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('drag-over-left', 'drag-over-right'));
-        }
-
-        // --- SIDEBAR & RESIZER LOGIK ---
-        const sidebarLeft = document.getElementById('sidebarLeft'); const sidebarRight = document.getElementById('sidebarRight');
-        function toggleLeftPanel(panelId) {
-            if (sidebarLeft.classList.contains('collapsed')) { sidebarLeft.classList.remove('collapsed'); switchLeftTab(panelId); } 
-            else { if (document.getElementById(`btn-${panelId}`).classList.contains('active')) { sidebarLeft.classList.add('collapsed'); document.getElementById(`btn-${panelId}`).classList.remove('active'); } else { switchLeftTab(panelId); } }
-        }
-        function switchLeftTab(panelId) {
-            document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active');
-            document.getElementById('panel-blocks').classList.remove('active'); document.getElementById('panel-files').classList.remove('active');
-            document.getElementById(`btn-${panelId}`).classList.add('active'); document.getElementById(`panel-${panelId}`).classList.add('active');
-        }
-        function toggleRightPanel() { sidebarRight.classList.toggle('collapsed'); document.getElementById('btn-emulator').classList.toggle('active'); }
-        function toggleConsole() { const p = document.getElementById('consolePanel'); p.classList.toggle('collapsed'); }
-
-        function initResizer(rId, pId, dir, rev, cId, cb) {
-            const r = document.getElementById(rId), p = document.getElementById(pId), c = document.getElementById(cId);
-            let sP = 0, sS = 0, isDO = false;
-            r.addEventListener('mousedown', e => {
-                e.preventDefault(); sP = dir === 'x' ? e.clientX : e.clientY;
-                if (c.classList.contains('collapsed')) { c.classList.remove('collapsed'); if (cb) cb(true); isDO = true; sS = 0; p.style[dir === 'x' ? 'width' : 'height'] = '0px'; } 
-                else { isDO = false; sS = p.getBoundingClientRect()[dir === 'x' ? 'width' : 'height']; }
-                document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
-                document.body.style.cursor = dir === 'x' ? 'col-resize' : 'row-resize'; document.body.classList.add('is-resizing');
-            });
-            function move(e) {
-                let dx = (dir === 'x' ? e.clientX : e.clientY) - sP; if (rev) dx = -dx; let nS = sS + dx;
-                if (isDO && nS < 50) { p.style[dir === 'x' ? 'width' : 'height'] = `${Math.max(0, nS)}px`; return; } else if (isDO && nS >= 50) { isDO = false; }
-                if (nS < 50) { if (!c.classList.contains('collapsed')) { c.classList.add('collapsed'); p.style[dir === 'x' ? 'width' : 'height'] = dir === 'x' ? '260px' : '150px'; if (cb) cb(false); } return; } 
-                else if (c.classList.contains('collapsed')) { c.classList.remove('collapsed'); if (cb) cb(true); }
-                p.style[dir === 'x' ? 'width' : 'height'] = `${nS}px`;
-            }
-            function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.cursor = 'default'; document.body.classList.remove('is-resizing'); }
-        }
-        initResizer('resizerLeft', 'contentLeft', 'x', false, 'sidebarLeft', o => { if(o && !document.getElementById('btn-blocks').classList.contains('active') && !document.getElementById('btn-files').classList.contains('active')) switchLeftTab('blocks'); else if(!o) { document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active'); } });
-        initResizer('resizerRight', 'contentRight', 'x', true, 'sidebarRight', o => { if(o) document.getElementById('btn-emulator').classList.add('active'); else document.getElementById('btn-emulator').classList.remove('active'); });
-        initResizer('resizerBottom', 'consoleContent', 'y', true, 'consolePanel', null);
-    </script>
 </body>
 </html>
