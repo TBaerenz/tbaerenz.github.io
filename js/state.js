@@ -14,12 +14,10 @@ let clipboard = null;
 let currentContextTarget = null;
 let currentLang = 'de';
 
-// Das Standard-Modell wird über eine Funktion zurückgegeben, 
-// damit es beim Projekt-Reload sauber zurückgesetzt werden kann.
 function getDefaultAppModel() {
     return {
         metadata: { appName: "MyApplication", packageName: "com.example.myapplication" },
-        state: { greetingName: "Android" },
+        variables: [], 
         screens: [{
             id: "MainActivity",
             layout: {
@@ -59,6 +57,26 @@ function removeNodeById(current, id) {
         }
     }
     return null;
+}
+
+function removeExpressionById(current, id) {
+    if (!current) return false;
+    let props = ['condition', 'value', 'left', 'right'];
+    for (let p of props) {
+        if (current[p] && typeof current[p] === 'object') {
+            if (current[p].id === id) {
+                current[p] = null;
+                return true;
+            }
+            if (removeExpressionById(current[p], id)) return true;
+        }
+    }
+    if (current.children) {
+        for (let child of current.children) {
+            if (removeExpressionById(child, id)) return true;
+        }
+    }
+    return false;
 }
 
 function getFullPath(element) {

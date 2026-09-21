@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Browser IDE - Edu-to-Pro</title>
     
-    <!-- JSZip Bibliothek -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
-        /* =========================================
-           Theme Variablen & Farbpaletten
-           ========================================= */
         :root {
             --bg-main: #f8fafc; --bg-panel: #ffffff; --bg-nav: #f1f5f9; --bg-canvas: #e2e8f0;
             --border-color: #cbd5e1;
             --text-main: #0f172a; --text-muted: #64748b; 
             --console-bg: #1e293b; --console-text: #fde047; --device-frame: #334155;
             --editor-bg: #ffffff; --editor-text: #334155;
-            --block-bg-color: #f8fafc; --block-border: #cbd5e1;
         }
 
         [data-theme="dark"] {
@@ -27,28 +22,26 @@
             --text-main: #fafaf9; --text-muted: #a8a29e; 
             --console-bg: #000000; --console-text: #fbbf24; --device-frame: #57534e;
             --editor-bg: #1e1e1e; --editor-text: #d4d4d4;
-            --block-bg-color: #292524; --block-border: #44403c;
         }
 
-        /* --- Paletten --- */
-        [data-color="sunset"] { --accent-color: #ea580c; --block-bg: #f97316; --resizer-hover: #ea580c; --block-text: #ffffff; }
-        [data-color="sunset"][data-theme="dark"] { --accent-color: #f97316; --block-bg: #fbbf24; --resizer-hover: #f97316; --block-text: #1c1917; }
-        [data-color="ocean"] { --accent-color: #0284c7; --block-bg: #0ea5e9; --resizer-hover: #0284c7; --block-text: #ffffff; }
-        [data-color="ocean"][data-theme="dark"] { --accent-color: #38bdf8; --block-bg: #7dd3fc; --resizer-hover: #38bdf8; --block-text: #1c1917; }
-        [data-color="emerald"] { --accent-color: #059669; --block-bg: #10b981; --resizer-hover: #059669; --block-text: #ffffff; }
-        [data-color="emerald"][data-theme="dark"] { --accent-color: #4ade80; --block-bg: #86efac; --resizer-hover: #4ade80; --block-text: #1c1917; }
-        [data-color="amethyst"] { --accent-color: #7c3aed; --block-bg: #8b5cf6; --resizer-hover: #7c3aed; --block-text: #ffffff; }
-        [data-color="amethyst"][data-theme="dark"] { --accent-color: #c084fc; --block-bg: #d8b4fe; --resizer-hover: #c084fc; --block-text: #1c1917; }
+        /* Farbschemata (Normale Befehle vs. Ausdrücke) */
+        [data-color="sunset"] { --accent-color: #ea580c; --block-bg: #f97316; --expr-bg: #eab308; --resizer-hover: #ea580c; --block-text: #ffffff; --expr-text: #ffffff; --block-bg-color: #f8fafc; --block-border: #cbd5e1; }
+        [data-color="sunset"][data-theme="dark"] { --accent-color: #f97316; --block-bg: #ea580c; --expr-bg: #facc15; --resizer-hover: #f97316; --block-text: #ffffff; --expr-text: #1c1917; --block-bg-color: #292524; --block-border: #44403c; }
+        
+        [data-color="ocean"] { --accent-color: #0284c7; --block-bg: #0ea5e9; --expr-bg: #8b5cf6; --resizer-hover: #0284c7; --block-text: #ffffff; --expr-text: #ffffff; --block-bg-color: #f8fafc; --block-border: #cbd5e1; }
+        [data-color="ocean"][data-theme="dark"] { --accent-color: #38bdf8; --block-bg: #0284c7; --expr-bg: #a78bfa; --resizer-hover: #38bdf8; --block-text: #ffffff; --expr-text: #1c1917; --block-bg-color: #292524; --block-border: #44403c; }
+        
+        [data-color="emerald"] { --accent-color: #059669; --block-bg: #10b981; --expr-bg: #14b8a6; --resizer-hover: #059669; --block-text: #ffffff; --expr-text: #ffffff; --block-bg-color: #f8fafc; --block-border: #cbd5e1; }
+        [data-color="emerald"][data-theme="dark"] { --accent-color: #4ade80; --block-bg: #059669; --expr-bg: #2dd4bf; --resizer-hover: #4ade80; --block-text: #ffffff; --expr-text: #1c1917; --block-bg-color: #292524; --block-border: #44403c; }
+        
+        [data-color="amethyst"] { --accent-color: #7c3aed; --block-bg: #8b5cf6; --expr-bg: #ec4899; --resizer-hover: #7c3aed; --block-text: #ffffff; --expr-text: #ffffff; --block-bg-color: #f8fafc; --block-border: #cbd5e1; }
+        [data-color="amethyst"][data-theme="dark"] { --accent-color: #c084fc; --block-bg: #7c3aed; --expr-bg: #f472b6; --resizer-hover: #c084fc; --block-text: #ffffff; --expr-text: #1c1917; --block-bg-color: #292524; --block-border: #44403c; }
 
-        /* =========================================
-           Globales Reset & Layout
-           ========================================= */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
         body.is-resizing * { user-select: none !important; pointer-events: none !important; }
         svg.icon { flex-shrink: 0; }
 
-        /* Top Menüleiste */
         .top-menu { height: 45px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 15px; z-index: 10; }
         .menu-items { display: flex; gap: 20px; font-size: 14px; position: relative; }
         .menu-items span { cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; user-select: none; }
@@ -57,7 +50,6 @@
         .header-btn { background: none; border: 1px solid var(--border-color); color: var(--text-main); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .header-btn:hover { background: var(--bg-nav); border-color: var(--accent-color); }
 
-        /* Workspace Layout */
         .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
         .resizer-x { width: 8px; margin: 0 -4px; flex-shrink: 0; cursor: col-resize; position: relative; z-index: 10; }
         .resizer-x::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background-color: var(--border-color); transition: 0.2s; }
@@ -66,7 +58,6 @@
         .resizer-y::after { content: ''; position: absolute; left: 0; right: 0; top: 3px; height: 2px; background-color: var(--border-color); transition: 0.2s; }
         .resizer-y:hover::after, .resizer-y:active::after { background-color: var(--resizer-hover); top: 2px; height: 4px; }
 
-        /* Seitenleisten */
         .sidebar { display: flex; background-color: var(--bg-panel); }
         .side-nav { width: 50px; min-width: 50px; background-color: var(--bg-nav); display: flex; flex-direction: column; align-items: center; padding-top: 10px; border-right: 1px solid var(--border-color); border-left: 1px solid var(--border-color); z-index: 2; }
         .nav-btn { background: none; border: none; padding: 10px; margin-bottom: 5px; cursor: pointer; border-radius: 8px; transition: 0.2s; display: flex; justify-content: center; align-items: center; color: var(--text-muted); }
@@ -81,14 +72,22 @@
         .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
         .btn-icon:hover { color: var(--accent-color); }
 
-        /* Blocks Sidebar */
         .category summary { padding: 12px 15px; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border-color); list-style: none; white-space: nowrap; }
         .category summary:hover { background-color: rgba(0,0,0,0.03); }
         .commands-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .command-block { background-color: var(--block-bg); color: var(--block-text); font-weight: 500; padding: 8px 12px; border-radius: 4px; cursor: grab; font-size: 13px; white-space: nowrap; transition: 0.2s; }
+        
+        /* STATEMENT-BLÖCKE */
+        .command-block { background-color: var(--block-bg); color: var(--block-text); font-weight: 500; padding: 8px 12px; border-radius: 4px; cursor: grab; font-size: 13px; white-space: nowrap; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .command-block:hover { filter: brightness(1.1); transform: scale(1.02); }
 
-        /* Dateibrowser & Ordner */
+        /* EXPRESSION-BLÖCKE (Werte, Boolean) */
+        .command-block.pill, .command-block.val-expr { background-color: var(--expr-bg); color: var(--expr-text); }
+        .command-block.pill { border-radius: 20px; text-align: center; }
+        .command-block.val-expr { border-radius: 6px; text-align: center; }
+
+        .btn-add-var { width: 100%; background: var(--bg-nav); border: 1px dashed var(--border-color); padding: 8px; color: var(--text-main); font-weight: 600; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.2s; margin-bottom: 5px; }
+        .btn-add-var:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
         .file-tree { padding: 10px; font-size: 14px; white-space: nowrap; user-select: none; }
         .folder summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 5px 0; }
         .folder summary::-webkit-details-marker { display: none; } 
@@ -104,7 +103,6 @@
         .file-item:hover .icon-file { color: var(--accent-color); }
         .cut-item { opacity: 0.4; border: 1px dashed var(--accent-color); padding-left: 4px; border-radius: 4px;}
 
-        /* Dropdown Menüs */
         .context-menu { position: absolute; display: none; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; min-width: 170px; }
         .context-menu.active { display: block; }
         .context-menu ul { list-style: none; padding: 5px 0; margin: 0; }
@@ -119,9 +117,7 @@
         .context-menu .submenu li { justify-content: flex-start; color: var(--text-main); }
         .context-menu .has-submenu:hover .submenu li { color: var(--text-main); background: var(--bg-panel); }
         .context-menu .has-submenu:hover .submenu li:hover { background: var(--accent-color); color: #fff; }
-        .palette-swatch { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1); }
 
-        /* Modals */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
         .modal-overlay.active { display: flex; opacity: 1; }
         .modal-content { background: var(--bg-panel); padding: 25px; border-radius: 12px; width: 320px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: 1px solid var(--border-color); transform: translateY(-20px); transition: transform 0.2s; }
@@ -137,10 +133,7 @@
         .btn-cancel:hover { background: var(--border-color); }
         .btn-confirm { background: var(--accent-color); color: #fff; }
         .btn-confirm:hover { filter: brightness(1.1); }
-        .btn-danger { background: #ef4444; color: #fff; }
-        .btn-danger:hover { background: #dc2626; }
 
-        /* Mitte: Tabs & Canvas */
         .main-area { flex: 1; display: flex; flex-direction: column; min-width: 150px; background-color: var(--bg-canvas); }
         .editor-tabs { display: flex; background-color: var(--bg-nav); border-bottom: 1px solid var(--border-color); overflow-x: auto; overflow-y: hidden; min-height: 35px; }
         .editor-tabs.hidden { display: none; }
@@ -149,26 +142,89 @@
         .editor-tab.active { background-color: var(--editor-bg); color: var(--accent-color); border-top: 2px solid var(--accent-color); }
 
         .canvas { flex: 1; display: flex; flex-direction: column; background-image: radial-gradient(var(--border-color) 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; position: relative;}
-        
-        /* Text Editor */
         .code-editor { width: 100%; height: 100%; resize: none; border: none; outline: none; background-color: var(--editor-bg); color: var(--editor-text); font-family: 'Courier New', Courier, monospace; font-size: 14px; padding: 20px; line-height: 1.5; white-space: pre; overflow: auto; display: none; }
         .block-editor { width: 100%; height: 100%; overflow: auto; padding: 20px; display: none; background-color: var(--bg-canvas); }
-
-        /* View State Logic */
         .canvas.mode-code.has-file { background-image: none; background-color: var(--editor-bg); }
         .canvas.mode-code.has-file .code-editor { display: block; }
-        .canvas.mode-block .block-editor { display: flex; flex-direction: column; gap: 15px; align-items: flex-start; }
+        .canvas.mode-block .block-editor { display: flex; flex-direction: column; gap: 0px; align-items: flex-start; }
 
-        /* Drag & Drop Visual Blocks */
-        .visual-block { background: var(--block-bg-color); border: 1px solid var(--block-border); border-radius: 8px; padding: 12px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 250px; transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
-        .visual-block.drag-over { border: 2px dashed var(--accent-color) !important; background-color: rgba(234, 88, 12, 0.05) !important; box-shadow: inset 0 0 0 2px var(--accent-color); }
-        .visual-block-header { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--accent-color); display: flex; align-items: center; gap: 8px; }
-        .visual-block-children { padding-left: 20px; border-left: 2px dashed var(--border-color); margin-top: 15px; display: flex; flex-direction: column; gap: 10px; min-height: 10px; }
+        /* =========================================
+           Visual Blocks, Drop Zones & Expressions
+           ========================================= */
+        .visual-block { background: var(--block-bg-color); border: 1px solid var(--block-border); border-radius: 8px; padding: 12px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 250px; width: fit-content; transition: border-color 0.2s, background-color 0.2s; }
+        .visual-block-header { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--accent-color); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .visual-block-children { padding-left: 20px; border-left: 2px dashed var(--border-color); margin-top: 10px; display: flex; flex-direction: column; gap: 0px; min-height: 20px; }
+        
         .visual-block-prop { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-top: 8px; color: var(--text-main); }
-        .visual-block-prop input { background: var(--bg-main); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px 10px; outline: none; font-size: 13px; width: 100%; transition: border-color 0.2s; }
-        .visual-block-prop input:focus { border-color: var(--accent-color); }
 
-        /* Konsole & Rechte Seite */
+        /* EINHEITLICHES DESIGN für alle Dropdowns und Textfelder */
+        .block-control {
+            background-color: var(--bg-main) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 4px !important;
+            padding: 4px 8px !important;
+            outline: none !important;
+            font-size: 13px !important;
+            transition: border-color 0.2s !important;
+            cursor: pointer;
+            box-sizing: border-box;
+            height: 30px;
+            font-family: inherit;
+        }
+        .block-control:focus { border-color: var(--accent-color) !important; }
+        .block-control[type="text"], .block-control[type="number"] { cursor: text; }
+        .block-control option { background-color: var(--bg-panel); color: var(--text-main); }
+
+        /* Drop Zones (Die Linien ZWISCHEN den Blöcken) */
+        .drop-zone { height: 16px; margin: -8px 0; border-radius: 8px; background: transparent; position: relative; z-index: 10; transition: 0.2s; cursor: pointer; }
+        .drop-zone.drag-over { background: var(--accent-color) !important; transform: scaleY(1.3); }
+
+        /* Wenn ein Block (If/Schleife/Scaffold) LEER ist, machen wir die Drop Zone riesig! */
+        .drop-zone:only-child { 
+            height: 36px; margin: 5px 0; 
+            border: 2px dashed var(--border-color); border-radius: 8px; 
+            background: rgba(0,0,0,0.02); 
+            display: flex; align-items: center; justify-content: center; 
+        }
+        [data-theme="dark"] .drop-zone:only-child { background: rgba(255,255,255,0.02); }
+        .drop-zone:only-child::after { content: '+'; font-size: 20px; font-weight: bold; color: var(--text-muted); pointer-events: none; }
+        .drop-zone:only-child.drag-over { border-color: var(--accent-color) !important; background: rgba(234,88,12,0.1) !important; transform: none; }
+
+        /* Expression Lücken (Slots) */
+        .pill-slot { 
+            display: inline-flex; align-items: center; justify-content: center; min-width: 80px; height: 32px; 
+            border: 2px dashed var(--border-color); border-radius: 20px; 
+            padding: 0 10px; font-size: 12px; color: var(--text-muted); 
+            background: rgba(0,0,0,0.03); transition: 0.2s; cursor: pointer;
+        }
+        .val-slot {
+            display: inline-flex; align-items: center; justify-content: center; min-width: 60px; height: 32px; 
+            border: 2px dashed var(--border-color); border-radius: 6px; 
+            padding: 0 10px; font-size: 12px; color: var(--text-muted); 
+            background: rgba(0,0,0,0.03); transition: 0.2s; cursor: pointer;
+        }
+        
+        [data-theme="dark"] .pill-slot, [data-theme="dark"] .val-slot { background: rgba(255,255,255,0.05); }
+        
+        .pill-slot.has-value, .val-slot.has-value { padding: 0; border: 2px solid transparent; background: transparent; }
+        
+        .pill-slot.drag-over, .val-slot.drag-over { 
+            border: 2px dashed var(--accent-color) !important; 
+            background: rgba(234,88,12,0.1) !important; 
+        }
+        
+        .expr-block { 
+            display: inline-flex; align-items: center; height: 32px; 
+            padding: 0 10px; font-size: 13px; 
+            background-color: var(--expr-bg); color: var(--expr-text); font-weight: 500; 
+            cursor: grab; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: max-content; white-space: nowrap;
+        }
+
+        /* Deaktiviere falsche Ziele während des Draggings */
+        body.dragging-stmt .pill-slot, body.dragging-stmt .val-slot { pointer-events: none !important; opacity: 0.5; }
+        body.dragging-expr .drop-zone { pointer-events: none !important; opacity: 0; }
+
         .console-container { display: flex; flex-direction: column; }
         .console-header { padding: 8px 15px; background-color: var(--bg-panel); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .console-header:hover { color: var(--accent-color); }
@@ -188,7 +244,6 @@
 </head>
 <body>
 
-    <!-- Eigenes Modal -->
     <div class="modal-overlay" id="customModal">
         <div class="modal-content">
             <div class="modal-title" id="modalTitle">Titel</div>
@@ -202,12 +257,10 @@
         </div>
     </div>
 
-    <!-- Dropdown für "Datei" -->
     <div class="context-menu" id="fileMenuDropdown">
         <ul><li onclick="loadDefaultProject()"><span data-i18n="menu_file_load_default">Neues Projekt (Standard)</span></li></ul>
     </div>
 
-    <!-- Dropdown-Menü für das Plus-Icon (+) im Dateibrowser -->
     <div class="context-menu" id="createMenu">
         <ul>
             <li onclick="startCreate('file', '.app')"><span data-i18n="ctx_new_app">Neue .app Datei</span></li>
@@ -218,7 +271,6 @@
         </ul>
     </div>
 
-    <!-- Erweitertes Kontextmenü (Rechtsklick Dateibrowser) -->
     <div class="context-menu" id="contextMenu">
         <ul>
             <li class="has-submenu">
@@ -241,7 +293,6 @@
         </ul>
     </div>
 
-    <!-- Dropdown-Menü für "Ansicht" -->
     <div class="context-menu" id="viewMenu">
         <ul>
             <li onclick="setEditorMode('block')"><span data-i18n="menu_view_block">Block-Editor (Visuell)</span></li>
@@ -281,12 +332,37 @@
             <div class="side-content" id="contentLeft">
                 <div class="panel-section active" id="panel-blocks">
                     <div class="panel-title-bar"><span class="panel-title" data-i18n="panel_blocks">UI Elemente (Drag)</span></div>
+                    
                     <details class="category" open><summary data-i18n="cat_control">Container & Layout</summary>
                         <div class="commands-list">
                             <div class="command-block" draggable="true" data-type="Scaffold" ondragstart="handleDragStartSidebar(event)" data-i18n="block_scaffold">Scaffold Container</div>
                             <div class="command-block" draggable="true" data-type="Greeting" ondragstart="handleDragStartSidebar(event)" data-i18n="block_greeting">Text (Greeting)</div>
                         </div>
                     </details>
+                    
+                    <details class="category" open><summary data-i18n="cat_vars">Variablen</summary>
+                        <div class="commands-list">
+                            <button class="btn-add-var" onclick="createNewVariable()" data-i18n="btn_new_var">+ Neue Variable</button>
+                            <div id="sidebarVarList" style="margin: 0 5px 8px 5px; font-size: 12px; color: var(--text-muted);"></div>
+                            <div class="command-block" draggable="true" data-type="SetVariable" ondragstart="handleDragStartSidebar(event)" data-i18n="block_set_var">Setze Variable</div>
+                            <div class="command-block val-expr" draggable="true" data-type="VarValue" data-is-expr="true" data-expr-type="value" ondragstart="handleDragStartSidebar(event)" data-i18n="block_get_var">Variable (Wert)</div>
+                        </div>
+                    </details>
+
+                    <details class="category" open><summary data-i18n="cat_logic">Logik & Schleifen</summary>
+                        <div class="commands-list">
+                            <div class="command-block" draggable="true" data-type="If" ondragstart="handleDragStartSidebar(event)" data-i18n="block_if">If (Bedingung)</div>
+                            <div class="command-block" draggable="true" data-type="Loop" ondragstart="handleDragStartSidebar(event)" data-i18n="block_loop">Schleife (Solange...)</div>
+                            
+                            <!-- Ausdrücke -->
+                            <div class="command-block pill" draggable="true" data-type="BooleanValue" data-is-expr="true" data-expr-type="boolean" ondragstart="handleDragStartSidebar(event)" data-i18n="block_boolean">Wahr / Falsch</div>
+                            <div class="command-block pill" draggable="true" data-type="LogicAnd" data-is-expr="true" data-expr-type="boolean" ondragstart="handleDragStartSidebar(event)" data-i18n="block_and">Und (AND)</div>
+                            <div class="command-block pill" draggable="true" data-type="LogicOr" data-is-expr="true" data-expr-type="boolean" ondragstart="handleDragStartSidebar(event)" data-i18n="block_or">Oder (OR)</div>
+                            <div class="command-block pill" draggable="true" data-type="Comparison" data-is-expr="true" data-expr-type="boolean" ondragstart="handleDragStartSidebar(event)" data-i18n="block_comparison">Vergleich (=, >)</div>
+                            <div class="command-block val-expr" draggable="true" data-type="NumberValue" data-is-expr="true" data-expr-type="value" ondragstart="handleDragStartSidebar(event)" data-i18n="block_number">Zahl (123)</div>
+                        </div>
+                    </details>
+                    
                 </div>
                 
                 <div class="panel-section" id="panel-files">
@@ -335,7 +411,6 @@
         </aside>
     </main>
 
-    <!-- JS DATEIEN EINBINDEN -->
     <script src="js/state.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/editor.js"></script>

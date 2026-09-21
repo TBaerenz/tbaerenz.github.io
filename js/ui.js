@@ -11,13 +11,34 @@ const dictionary = {
     'menu_view_palette': { de: 'Farbpalette wählen...', en: 'Choose Color Palette...' },
     'panel_blocks': { de: 'UI Elemente (Drag)', en: 'UI Elements (Drag)' },
     'panel_files': { de: 'Projektdateien', en: 'Project Files' },
+    
     'cat_control': { de: 'Container & Layout', en: 'Container & Layout' },
+    'cat_logic': { de: 'Logik & Schleifen', en: 'Logic & Loops' },
+    'cat_vars': { de: 'Variablen', en: 'Variables' },
+    
+    'block_scaffold': { de: 'Scaffold Container', en: 'Scaffold Container' },
+    'block_greeting': { de: 'Text (Greeting)', en: 'Text (Greeting)' },
+    'block_if': { de: 'If (Bedingung)', en: 'If (Condition)' },
+    'block_loop': { de: 'Schleife (Solange...)', en: 'Loop (While...)' },
+    'block_boolean': { de: 'Wahr / Falsch', en: 'True / False' },
+    'block_number': { de: 'Zahl (123)', en: 'Number (123)' },
+    'block_comparison': { de: 'Vergleich (=, >)', en: 'Comparison (=, >)' },
+    'block_and': { de: 'Und (AND)', en: 'And (AND)' },
+    'block_or': { de: 'Oder (OR)', en: 'Or (OR)' },
+    'block_set_var': { de: 'Setze Variable', en: 'Set Variable' },
+    'block_get_var': { de: 'Variable (Wert)', en: 'Variable (Value)' },
+    
+    'btn_new_var': { de: '+ Neue Variable', en: '+ New Variable' },
+    'prompt_new_var': { de: 'Name der neuen Variable (z.B. punkte):', en: 'Name of new variable (e.g. score):' },
+    'prompt_var_success': { de: 'Variable erfolgreich erstellt: ', en: 'Variable successfully created: ' },
+    'sidebar_no_vars': { de: 'Keine Variablen definiert', en: 'No variables defined' },
+    'sidebar_vars_list': { de: 'Variablen:', en: 'Variables:' },
+    'drop_expr': { de: '...ablegen', en: '...drop' },
+
     'tree_empty': { de: 'Kein Projekt geladen. Wähle "Datei -> Neues Projekt".', en: 'No project loaded. Choose "File -> New Project".' },
     'terminal_title': { de: 'Terminal / Logs', en: 'Terminal / Logs' },
     'terminal_ready': { de: '> System bereit.', en: '> System ready.' },
     'emulator_title': { de: 'Live Emulator', en: 'Live Emulator' },
-    'block_scaffold': { de: 'Scaffold Container', en: 'Scaffold Container' },
-    'block_greeting': { de: 'Text (Greeting)', en: 'Text (Greeting)' },
     'ctx_new': { de: 'Erstellen', en: 'Create' }, 'ctx_add': { de: 'Hinzufügen', en: 'Add' },
     'ctx_new_app': { de: 'Neue .app Datei', en: 'New .app File' }, 'ctx_new_folder': { de: 'Neuer Ordner', en: 'New Folder' },
     'ctx_rename': { de: 'Umbenennen', en: 'Rename' }, 'ctx_delete': { de: 'Löschen', en: 'Delete' },
@@ -29,6 +50,7 @@ const dictionary = {
     'btn_cancel': { de: 'Abbrechen', en: 'Cancel' }, 'btn_ok': { de: 'OK', en: 'OK' },
     'err_empty_name': { de: 'Der Name darf nicht leer sein.', en: 'Name cannot be empty.' },
     'err_invalid_name': { de: 'Punkte (.) und Sonderzeichen sind nicht erlaubt.', en: 'Dots (.) and special characters are not allowed.' },
+    'err_var_exists': { de: 'Diese Variable existiert bereits.', en: 'This variable already exists.' },
     'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
     'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
     'color_emerald': { de: 'Emerald Green', en: 'Emerald Green' },
@@ -48,12 +70,9 @@ function toggleLanguage() {
 function toggleTheme() { const htmlTag = document.documentElement; htmlTag.setAttribute('data-theme', htmlTag.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); hideAllMenus(); }
 function applyColorPalette(colorName) { document.documentElement.setAttribute('data-color', colorName); hideAllMenus(); }
 
-// ==========================================
-// MODALS
-// ==========================================
 function validateName(name) {
     if (!name || name.trim() === '') return 'err_empty_name';
-    const forbiddenChars = /[\\/:\*\?"<>\|.]/;
+    const forbiddenChars = /[\\/:\*\?"<>\|.\s]/;
     if (forbiddenChars.test(name)) return 'err_invalid_name';
     return null; 
 }
@@ -106,9 +125,6 @@ function openModal(options) {
     });
 }
 
-// ==========================================
-// MENÜ STEUERUNG
-// ==========================================
 const contextMenu = document.getElementById('contextMenu');
 const createMenu = document.getElementById('createMenu');
 const viewMenu = document.getElementById('viewMenu');
@@ -120,9 +136,6 @@ function showViewMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.t
 function showCreateMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); createMenu.style.left = rect.left + 'px'; createMenu.style.top = (rect.bottom + 5) + 'px'; createMenu.classList.add('active'); }
 document.addEventListener('click', hideAllMenus);
 
-// ==========================================
-// SIDEBAR & RESIZER LOGIK
-// ==========================================
 const sidebarLeft = document.getElementById('sidebarLeft'); 
 const sidebarRight = document.getElementById('sidebarRight');
 
@@ -158,7 +171,6 @@ function initResizer(rId, pId, dir, rev, cId, cb) {
     function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.cursor = 'default'; document.body.classList.remove('is-resizing'); }
 }
 
-// Resizer Setup
 initResizer('resizerLeft', 'contentLeft', 'x', false, 'sidebarLeft', o => { if(o && !document.getElementById('btn-blocks').classList.contains('active') && !document.getElementById('btn-files').classList.contains('active')) switchLeftTab('blocks'); else if(!o) { document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active'); } });
 initResizer('resizerRight', 'contentRight', 'x', true, 'sidebarRight', o => { if(o) document.getElementById('btn-emulator').classList.add('active'); else document.getElementById('btn-emulator').classList.remove('active'); });
 initResizer('resizerBottom', 'consoleContent', 'y', true, 'consolePanel', null);
