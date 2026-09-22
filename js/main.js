@@ -4,7 +4,8 @@
 function updateAllViews() {
     renderBlockEditor();      
     renderEmulator();         
-    syncKotlinCodeToVFS();    
+    syncKotlinCodeToVFS();
+    if (window.refreshStaticAnalysis) window.refreshStaticAnalysis();
 }
 
 // ==========================================

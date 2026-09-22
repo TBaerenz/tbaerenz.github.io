@@ -33,7 +33,8 @@ const dictionary = {
     'block_return': { de: 'Return (Rückgabe)', en: 'Return (Value)' },
     
     'btn_new_var': { de: '+ Neue Variable', en: '+ New Variable' },
-    'prompt_new_var': { de: 'Name der neuen Variable (z.B. punkte):', en: 'Name of new variable (e.g. score):' },
+    'prompt_new_var': { de: 'Name der neuen Variable:', en: 'Name of new variable:' },
+    'prompt_new_local_var': { de: 'Name der neuen lokalen Variable:', en: 'Name of new local variable:' },
     'prompt_var_success': { de: 'Variable erfolgreich erstellt: ', en: 'Variable successfully created: ' },
     'sidebar_no_vars': { de: 'Keine Variablen definiert', en: 'No variables defined' },
     'sidebar_vars_list': { de: 'Variablen:', en: 'Variables:' },
@@ -56,6 +57,9 @@ const dictionary = {
     'terminal_title': { de: 'Terminal / Logs', en: 'Terminal / Logs' },
     'terminal_ready': { de: '> System bereit.', en: '> System ready.' },
     'emulator_title': { de: 'Live Emulator', en: 'Live Emulator' },
+    'problems_title': { de: 'Fehler & Warnungen', en: 'Problems' },
+    'no_problems': { de: 'Keine Probleme gefunden.', en: 'No problems found.' },
+    
     'ctx_new': { de: 'Erstellen', en: 'Create' }, 'ctx_add': { de: 'Hinzufügen', en: 'Add' },
     'ctx_new_app': { de: 'Neue .app Datei', en: 'New .app File' }, 'ctx_new_folder': { de: 'Neuer Ordner', en: 'New Folder' },
     'ctx_rename': { de: 'Umbenennen', en: 'Rename' }, 'ctx_delete': { de: 'Löschen', en: 'Delete' },
@@ -68,10 +72,12 @@ const dictionary = {
     'err_empty_name': { de: 'Der Name darf nicht leer sein.', en: 'Name cannot be empty.' },
     'err_invalid_name': { de: 'Punkte (.) und Sonderzeichen sind nicht erlaubt.', en: 'Dots (.) and special characters are not allowed.' },
     'err_name_exists': { de: 'Dieser Name (Variable/Funktion) existiert bereits.', en: 'This name (variable/function) already exists.' },
+    
     'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
     'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
     'color_emerald': { de: 'Emerald Green', en: 'Emerald Green' },
     'color_amethyst': { de: 'Amethyst Purple', en: 'Amethyst Purple' },
+    
     'prompt_new_project_warn': { de: 'Achtung: Alle nicht gespeicherten Änderungen werden verworfen. Fortfahren?', en: 'Warning: All unsaved changes will be lost. Continue?' },
     'btn_clear': { de: 'Leeren', en: 'Clear' },
 };
@@ -169,12 +175,42 @@ function toggleLeftPanel(panelId) {
     if (sidebarLeft.classList.contains('collapsed')) { sidebarLeft.classList.remove('collapsed'); switchLeftTab(panelId); } 
     else { if (document.getElementById(`btn-${panelId}`).classList.contains('active')) { sidebarLeft.classList.add('collapsed'); document.getElementById(`btn-${panelId}`).classList.remove('active'); } else { switchLeftTab(panelId); } }
 }
+
 function switchLeftTab(panelId) {
     document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active');
     document.getElementById('panel-blocks').classList.remove('active'); document.getElementById('panel-files').classList.remove('active');
     document.getElementById(`btn-${panelId}`).classList.add('active'); document.getElementById(`panel-${panelId}`).classList.add('active');
 }
-function toggleRightPanel() { sidebarRight.classList.toggle('collapsed'); document.getElementById('btn-emulator').classList.toggle('active'); }
+
+function toggleRightPanel(panelId) {
+    if (sidebarRight.classList.contains('collapsed')) { 
+        sidebarRight.classList.remove('collapsed'); 
+        switchRightTab(panelId);
+        // Falls die Breite vorher 0 war (durch Resizer), wiederherstellen
+        if(document.getElementById('contentRight').getBoundingClientRect().width < 50) {
+            document.getElementById('contentRight').style.width = '280px';
+        }
+    } 
+    else { 
+        if (document.getElementById(`btn-${panelId}`).classList.contains('active')) { 
+            sidebarRight.classList.add('collapsed'); 
+            document.getElementById(`btn-${panelId}`).classList.remove('active'); 
+        } else { 
+            switchRightTab(panelId); 
+        } 
+    }
+}
+
+function switchRightTab(panelId) {
+    document.getElementById('btn-emulator').classList.remove('active');
+    document.getElementById('btn-problems').classList.remove('active');
+    document.getElementById('panel-emulator').classList.remove('active');
+    document.getElementById('panel-problems').classList.remove('active');
+
+    document.getElementById(`btn-${panelId}`).classList.add('active');
+    document.getElementById(`panel-${panelId}`).classList.add('active');
+}
+
 function toggleConsole() { const p = document.getElementById('consolePanel'); p.classList.toggle('collapsed'); }
 
 function initResizer(rId, pId, dir, rev, cId, cb) {
@@ -198,5 +234,15 @@ function initResizer(rId, pId, dir, rev, cId, cb) {
 }
 
 initResizer('resizerLeft', 'contentLeft', 'x', false, 'sidebarLeft', o => { if(o && !document.getElementById('btn-blocks').classList.contains('active') && !document.getElementById('btn-files').classList.contains('active')) switchLeftTab('blocks'); else if(!o) { document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active'); } });
-initResizer('resizerRight', 'contentRight', 'x', true, 'sidebarRight', o => { if(o) document.getElementById('btn-emulator').classList.add('active'); else document.getElementById('btn-emulator').classList.remove('active'); });
+
+// Anpassung für Resizer Rechts (mit 2 Tabs)
+initResizer('resizerRight', 'contentRight', 'x', true, 'sidebarRight', o => { 
+    if(o && !document.getElementById('btn-emulator').classList.contains('active') && !document.getElementById('btn-problems').classList.contains('active')) {
+        switchRightTab('emulator'); 
+    } else if(!o) { 
+        document.getElementById('btn-emulator').classList.remove('active'); 
+        document.getElementById('btn-problems').classList.remove('active'); 
+    } 
+});
+
 initResizer('resizerBottom', 'consoleContent', 'y', true, 'consolePanel', null);

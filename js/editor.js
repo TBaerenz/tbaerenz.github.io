@@ -2,15 +2,30 @@
 // GLOBALE DRAG STATE TRACKER
 // ==========================================
 window.draggedExprType = null;
+window.draggedNodeType = null; // Um zu verhindern, dass Funktion-Definitions in normale Drops droppen
+let highlightTimeout = null; // Für das Usage-Highlighting
+
 function getExprType(type) {
     if (['BooleanValue', 'Comparison', 'LogicAnd', 'LogicOr'].includes(type)) return 'boolean';
     if (['NumberValue', 'VarValue', 'CallFunctionExpr'].includes(type)) return 'value';
     return null;
 }
 
-// Prüft ob ein Name schon als Variable oder Funktion genutzt wird
+// Holt alle globalen Variablen + Funktionsparameter für Dropdowns
+function getAllVariables() {
+    return Array.from(new Set([
+        ...appModel.variables, 
+        ...appModel.functions.flatMap(f => f.params)
+    ]));
+}
+
+// Prüft ob ein Name schon irgendwo existiert (Globale Vars, Lokale Vars, Parameter, Funktionen)
 function checkNameExists(name) {
     let allNames = [...appModel.variables, ...appModel.functions.map(f => f.name)];
+    appModel.functions.forEach(f => {
+        allNames.push(...(f.params || []));
+        allNames.push(...(f.localVars || []));
+    });
     return allNames.includes(name);
 }
 
@@ -18,14 +33,13 @@ function checkNameExists(name) {
 function makeControl(tagName) {
     let el = document.createElement(tagName);
     el.className = 'block-control';
-    // Dies verhindert, dass ein Klick in das Eingabefeld den Block zum Draggen auswählt!
     el.addEventListener('mousedown', e => e.stopPropagation());
     el.addEventListener('touchstart', e => e.stopPropagation(), {passive: true});
     return el;
 }
 
 // Hilfsfunktion: Setzt Drag-Klassen sicher
-function setDragState(isExpr, type) {
+function setDragState(isExpr, type, nodeType) {
     if (isExpr) {
         document.body.classList.add('dragging-expr');
         document.body.classList.remove('dragging-stmt');
@@ -35,19 +49,227 @@ function setDragState(isExpr, type) {
         document.body.classList.remove('dragging-expr');
         window.draggedExprType = null;
     }
+    window.draggedNodeType = nodeType || null;
 }
 
-// Diese Funktion reinigt alle Drag-Zustände, egal was passiert ist
+// Reinigt alle Drag-Zustände
 function clearDragState() {
     document.body.classList.remove('dragging-expr', 'dragging-stmt');
     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     document.querySelectorAll('.visual-block').forEach(el => el.style.opacity = '');
     document.querySelectorAll('.expr-block').forEach(el => el.style.opacity = '');
     window.draggedExprType = null;
+    window.draggedNodeType = null;
 }
 
 // Wenn ein Dragvorgang standardmäßig endet
 document.addEventListener('dragend', clearDragState);
+
+// ==========================================
+// HIGHLIGHTING (Laufzeit-basiert)
+// ==========================================
+window.currentAnalysis = { varUsageOrder: {}, errors: [], warnings: [] };
+
+window.highlightVar = function(varName) {
+    clearTimeout(highlightTimeout);
+    document.querySelectorAll('.highlight-first, .highlight-sub').forEach(el => el.classList.remove('highlight-first', 'highlight-sub'));
+    if (!varName) return;
+    
+    let order = window.currentAnalysis.varUsageOrder[varName] || [];
+    order.forEach((id, idx) => {
+        let el = document.getElementById('block_' + id) || document.getElementById('expr_' + id);
+        if (el) {
+            if (idx === 0) el.classList.add('highlight-first');
+            else el.classList.add('highlight-sub');
+        }
+    });
+};
+
+window.unhighlightVar = function() {
+    clearTimeout(highlightTimeout);
+    highlightTimeout = setTimeout(() => {
+        document.querySelectorAll('.highlight-first, .highlight-sub').forEach(el => el.classList.remove('highlight-first', 'highlight-sub'));
+    }, 1000);
+};
+
+// ==========================================
+// STATIC ANALYSIS (AST)
+// ==========================================
+function analyzeAST() {
+    let errors = [];
+    let warnings = [];
+    let varUsageOrder = {}; 
+    let everAssigned = new Set();
+    let traversedFuncs = new Set();
+    let calledFuncs = new Set(); // Speichert ab, welche Funktionen im AST aufgerufen werden
+
+    function addUsage(v, id) {
+        if(!varUsageOrder[v]) varUsageOrder[v] = [];
+        varUsageOrder[v].push(id);
+    }
+
+    function checkVarExists(vName, declaredVars, nodeId) {
+        if (!declaredVars.has(vName)) {
+            errors.push({ type: 'error', msg: `Variable '${vName}' existiert nicht (gelöscht?).`, nodeId });
+            return false;
+        }
+        return true;
+    }
+
+    function checkFuncExists(fName, nodeId) {
+        if (!appModel.functions.some(f => f.name === fName)) {
+            errors.push({ type: 'error', msg: `Funktion '${fName}' existiert nicht (gelöscht?).`, nodeId });
+            return false;
+        }
+        return true;
+    }
+
+    function traverse(node, ctx) {
+        if (!node || typeof node !== 'object') return;
+
+        if (node.type === 'SetVariable') {
+            if (node.value) traverse(node.value, ctx);
+            let v = node.props.varName;
+            if (v) {
+                addUsage(v, node.id);
+                if (checkVarExists(v, ctx.declaredVars, node.id)) {
+                    ctx.assignedVars.add(v);
+                    everAssigned.add(v);
+                }
+            }
+        } else if (node.type === 'VarValue') {
+            let v = node.props.varName;
+            if (v) {
+                addUsage(v, node.id);
+                if (checkVarExists(v, ctx.declaredVars, node.id)) {
+                    if (!ctx.assignedVars.has(v)) {
+                        errors.push({ type: 'error', msg: `Variable '${v}' wird verwendet, bevor ein Wert zugewiesen wurde.`, nodeId: node.id });
+                    }
+                }
+            }
+        } else if (node.type === 'CallFunction' || node.type === 'CallFunctionExpr') {
+            let fName = node.props.funcName;
+            if (node.args) { Object.values(node.args).forEach(arg => traverse(arg, ctx)); }
+            
+            if (fName && checkFuncExists(fName, node.id)) {
+                calledFuncs.add(fName); // Aufruf der Funktion registrieren
+                let fModel = appModel.functions.find(f => f.name === fName);
+                let fb = appModel.floatingBlocks.find(b => b.node.type === 'FunctionDef' && b.node.props.funcName === fName);
+                if (fb && !traversedFuncs.has(fName)) {
+                    traversedFuncs.add(fName); 
+                    let funcCtx = {
+                        assignedVars: new Set(ctx.assignedVars),
+                        declaredVars: new Set([...ctx.declaredVars, ...(fModel.params||[]), ...(fModel.localVars||[])])
+                    };
+                    if (fModel.params) fModel.params.forEach(p => funcCtx.assignedVars.add(p)); 
+                    
+                    if (fb.node.children) fb.node.children.forEach(c => traverse(c, funcCtx));
+
+                    funcCtx.assignedVars.forEach(v => {
+                        if (appModel.variables.includes(v)) {
+                            ctx.assignedVars.add(v);
+                            everAssigned.add(v);
+                        }
+                    });
+                    traversedFuncs.delete(fName);
+                }
+            }
+        } else if (node.type === 'If' || node.type === 'Loop') {
+            if (node.condition) traverse(node.condition, ctx);
+            let branchCtx = { assignedVars: new Set(ctx.assignedVars), declaredVars: ctx.declaredVars };
+            if (node.children) node.children.forEach(c => traverse(c, branchCtx));
+        } else {
+            if (node.children) node.children.forEach(c => traverse(c, ctx));
+            if (node.condition) traverse(node.condition, ctx);
+            if (node.left) traverse(node.left, ctx);
+            if (node.right) traverse(node.right, ctx);
+            if (node.value) traverse(node.value, ctx);
+        }
+    }
+
+    let mainCtx = { assignedVars: new Set(), declaredVars: new Set(appModel.variables) };
+    traverse(appModel.screens[0].layout, mainCtx);
+
+    appModel.functions.forEach(fModel => {
+        let fb = appModel.floatingBlocks.find(b => b.node.type === 'FunctionDef' && b.node.props.funcName === fModel.name);
+        
+        // Warnung ausgeben, wenn eine Funktion definiert, aber im Code nie angesprochen wird.
+        if (!calledFuncs.has(fModel.name)) {
+            warnings.push({ type: 'warning', msg: `Funktion '${fModel.name}' wird definiert, aber nie aufgerufen.`, nodeId: fb ? fb.node.id : undefined });
+        }
+
+        if (fb) {
+            let funcCtx = {
+                assignedVars: new Set(fModel.params || []), 
+                declaredVars: new Set([...appModel.variables, ...(fModel.params||[]), ...(fModel.localVars||[])])
+            };
+            if (fb.node.children) fb.node.children.forEach(c => traverse(c, funcCtx));
+        }
+    });
+
+    appModel.variables.forEach(v => {
+        if (!varUsageOrder[v] || varUsageOrder[v].length === 0) {
+            if (!everAssigned.has(v)) {
+                warnings.push({ type: 'warning', msg: `Variable '${v}' ist ohne Startwert und ungenutzt.` });
+            } else {
+                warnings.push({ type: 'warning', msg: `Variable '${v}' wurde belegt, aber nie gelesen.` });
+            }
+        }
+    });
+
+    return { errors, warnings, varUsageOrder };
+}
+
+window.updateStatusUI = function(analysis) {
+    const errBadge = document.getElementById('errorBadge');
+    const warnBadge = document.getElementById('warningBadge');
+    const problemsList = document.getElementById('problemsList');
+    
+    if(errBadge) errBadge.style.display = analysis.errors.length > 0 ? 'flex' : 'none';
+    if(warnBadge) warnBadge.style.display = analysis.warnings.length > 0 ? 'flex' : 'none';
+    if(document.getElementById('errorCount')) document.getElementById('errorCount').innerText = analysis.errors.length;
+    if(document.getElementById('warningCount')) document.getElementById('warningCount').innerText = analysis.warnings.length;
+    
+    const overlay = document.getElementById('statusOverlay');
+    if (!overlay || !problemsList) return;
+
+    if (analysis.errors.length === 0 && analysis.warnings.length === 0) {
+        overlay.style.display = 'none';
+        problemsList.innerHTML = `<div style="padding: 15px; color: var(--text-muted); font-size: 12px;">${dictionary['no_problems'][currentLang] || 'Keine Probleme gefunden.'}</div>`;
+        return;
+    }
+    
+    overlay.style.display = 'flex';
+    problemsList.innerHTML = '';
+    
+    let allItems = [...analysis.errors, ...analysis.warnings];
+    allItems.forEach(item => {
+        let el = document.createElement('div');
+        el.className = `status-item ${item.type}`;
+        el.innerText = item.msg;
+        if (item.nodeId) {
+            el.onmouseenter = () => {
+                let blockEl = document.getElementById('block_' + item.nodeId) || document.getElementById('expr_' + item.nodeId);
+                if (blockEl) blockEl.classList.add('error-pulse');
+            };
+            el.onmouseleave = () => {
+                let blockEl = document.getElementById('block_' + item.nodeId) || document.getElementById('expr_' + item.nodeId);
+                if (blockEl) blockEl.classList.remove('error-pulse');
+            };
+            el.onclick = () => {
+                let blockEl = document.getElementById('block_' + item.nodeId) || document.getElementById('expr_' + item.nodeId);
+                if (blockEl) blockEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            };
+            el.style.cursor = 'pointer';
+        }
+        problemsList.appendChild(el);
+    });
+}
+
+window.refreshStaticAnalysis = function() {
+    window.currentAnalysis = analyzeAST();
+    updateStatusUI(window.currentAnalysis);
+};
 
 // ==========================================
 // DRAG AND DROP (Logik)
@@ -57,7 +279,7 @@ function getLocalVarsForNode(id) {
         if (fb.node.type === 'FunctionDef') {
             if (fb.node.id === id || findNodeById(fb.node, id)) {
                 let fModel = appModel.functions.find(f => f.name === fb.node.props.funcName);
-                return fModel ? fModel.params : [];
+                if (fModel) return [...(fModel.params || []), ...(fModel.localVars || [])];
             }
         }
     }
@@ -67,8 +289,19 @@ function getLocalVarsForNode(id) {
 function handleDragStartSidebar(e) {
     const type = e.target.getAttribute('data-type');
     const isExpr = e.target.getAttribute('data-is-expr') === 'true';
-    e.dataTransfer.setData('application/json', JSON.stringify({ source: 'sidebar', type: type, isExpr: isExpr }));
-    setDragState(isExpr, getExprType(type));
+
+    const rect = e.target.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    e.dataTransfer.setData('application/json', JSON.stringify({ 
+        source: 'sidebar', 
+        type: type, 
+        isExpr: isExpr,
+        offsetX: offsetX,
+        offsetY: offsetY
+    }));
+    setDragState(isExpr, getExprType(type), type);
 }
 
 async function handleStatementDrop(e, parentId, index) {
@@ -78,6 +311,7 @@ async function handleStatementDrop(e, parentId, index) {
     try {
         let data = JSON.parse(e.dataTransfer.getData('application/json'));
         if (data.isExpr || data.source === 'editor-expr') { clearDragState(); return; }
+        if (data.type === 'FunctionDef') { clearDragState(); return; } 
         
         let parentNode = findNodeAnywhere(parentId);
         if (!parentNode || !parentNode.children) { clearDragState(); return; }
@@ -86,7 +320,7 @@ async function handleStatementDrop(e, parentId, index) {
             const newId = data.type.toLowerCase() + '_' + Date.now();
             let newNode = {
                 type: data.type, id: newId, props: {},
-                children: (['Scaffold', 'If', 'Loop', 'FunctionDef'].includes(data.type)) ? [] : undefined
+                children: (['Scaffold', 'If', 'Loop'].includes(data.type)) ? [] : undefined
             };
             if (data.type === 'Greeting') newNode.props = { name: "Neu" };
             if (data.type === 'If' || data.type === 'Loop') newNode.condition = { type: 'BooleanValue', id: genId('exp'), value: 'true' };
@@ -96,8 +330,9 @@ async function handleStatementDrop(e, parentId, index) {
                 let locals = getLocalVarsForNode(parentId);
                 let selectedVar = appModel.variables[0] || locals[0] || '';
                 if (!selectedVar) {
-                    selectedVar = await promptNewVariable();
-                    if (!selectedVar) { clearDragState(); return; } // Abbruch durch Nutzer
+                    selectedVar = await promptNewVariable(false);
+                    if (!selectedVar) { clearDragState(); return; } 
+                    appModel.variables.push(selectedVar);
                 }
                 newNode.props = { varName: selectedVar };
                 newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' };
@@ -112,7 +347,6 @@ async function handleStatementDrop(e, parentId, index) {
             parentNode.children.splice(index, 0, newNode);
         } else if (data.source === 'editor' && data.id !== parentId) {
             let movedNode = findNodeAnywhere(data.id);
-            // Funktionsdefinitionen dürfen nicht irgendwo zwischen Befehle geschoben werden
             if (movedNode && movedNode.type === 'FunctionDef') { clearDragState(); return; }
 
             movedNode = extractNodeFromAnywhere(data.id);
@@ -160,8 +394,9 @@ async function handleExpressionDrop(e, parentNode, propName, expectedType) {
             let locals = getLocalVarsForNode(parentNode.id);
             let selectedVar = appModel.variables[0] || locals[0] || '';
             if (!selectedVar) {
-                selectedVar = await promptNewVariable();
+                selectedVar = await promptNewVariable(false);
                 if (!selectedVar) { clearDragState(); return; }
+                appModel.variables.push(selectedVar);
             }
             exprNode = { type: 'VarValue', id: genId('exp'), props: { varName: selectedVar } };
         }
@@ -180,10 +415,13 @@ async function handleExpressionDrop(e, parentNode, propName, expectedType) {
 // ==========================================
 // VARIABLEN & FUNKTIONEN ERSTELLEN / LÖSCHEN
 // ==========================================
-async function promptNewVariable() {
+async function promptNewVariable(isLocal = false) {
+    let titleKey = isLocal ? 'prompt_new_local_var' : 'btn_new_var';
+    let msgKey = isLocal ? 'prompt_new_local_var' : 'prompt_new_var';
+    
     let varName = await openModal({ 
-        title: dictionary['btn_new_var'][currentLang], 
-        message: dictionary['prompt_new_var'][currentLang], 
+        title: dictionary[titleKey][currentLang] || dictionary['btn_new_var'][currentLang], 
+        message: dictionary[msgKey][currentLang] || dictionary['prompt_new_var'][currentLang], 
         type: 'prompt', 
         validate: (name) => {
             let err = validateName(name); if(err) return err;
@@ -191,17 +429,16 @@ async function promptNewVariable() {
             return null;
         } 
     });
-    if (varName) {
-        appModel.variables.push(varName);
-        logToConsole((dictionary['prompt_var_success'][currentLang] || 'Variable erstellt: ') + varName);
-        updateAllViews();
-        return varName;
-    }
-    return null;
+    return varName;
 }
 
 async function createNewVariable() {
-    await promptNewVariable();
+    let v = await promptNewVariable(false);
+    if (v) {
+        appModel.variables.push(v);
+        logToConsole((dictionary['prompt_var_success'][currentLang] || 'Variable erstellt: ') + v);
+        updateAllViews();
+    }
 }
 
 async function createNewFunction() {
@@ -229,7 +466,7 @@ async function createNewFunction() {
         params = paramsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
     }
 
-    appModel.functions.push({ name: funcName, params: params });
+    appModel.functions.push({ name: funcName, params: params, localVars: [] });
     let newNode = { type: 'FunctionDef', id: genId('func'), props: { funcName: funcName }, children: [] };
     appModel.floatingBlocks.push({ x: 50, y: 50 + appModel.floatingBlocks.length * 80, node: newNode });
     
@@ -244,7 +481,7 @@ async function editFunctionParams(funcName) {
         title: dictionary['ctx_edit_params'][currentLang],
         message: dictionary['prompt_func_params'][currentLang],
         type: 'prompt',
-        defaultValue: func.params.join(', ')
+        defaultValue: (func.params || []).join(', ')
     });
     if (paramsStr !== null) {
         func.params = paramsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -296,6 +533,13 @@ function highlightFunctionBlock(funcName) {
 }
 
 let currentListTarget = null;
+
+function bindListHoverEvents(span, name) {
+    span.onmouseenter = () => window.highlightVar(name);
+    span.onmouseleave = () => window.unhighlightVar();
+    span.onmousedown = () => window.highlightVar(name);
+}
+
 function renderVariableList() {
     const listEl = document.getElementById('sidebarVarList');
     if (!listEl) return;
@@ -312,6 +556,9 @@ function renderVariableList() {
             span.style.color = 'var(--accent-color)';
             span.style.fontWeight = 'bold';
             span.innerText = v;
+            
+            bindListHoverEvents(span, v);
+
             span.oncontextmenu = (e) => {
                 e.preventDefault(); e.stopPropagation(); hideAllMenus();
                 currentListTarget = { type: 'var', name: v };
@@ -365,6 +612,16 @@ function handleListCtxAction(action) {
             deleteVariable(currentListTarget.name);
         } else if (currentListTarget.type === 'func') {
             deleteFunctionDef(currentListTarget.name, null);
+        } else if (currentListTarget.type === 'local_var') {
+            let fModel = appModel.functions.find(f => f.name === currentListTarget.funcName);
+            if (fModel) {
+                if (fModel.params && fModel.params.includes(currentListTarget.name)) {
+                    fModel.params = fModel.params.filter(p => p !== currentListTarget.name);
+                } else if (fModel.localVars && fModel.localVars.includes(currentListTarget.name)) {
+                    fModel.localVars = fModel.localVars.filter(v => v !== currentListTarget.name);
+                }
+                updateAllViews();
+            }
         }
     }
     currentListTarget = null;
@@ -372,7 +629,6 @@ function handleListCtxAction(action) {
 
 function createVariableDropdown(selectedValue, onChangeCallback, localVars = []) {
     const sel = makeControl('select');
-    
     sel.innerHTML = `<option value="__NEW__" style="font-weight:bold; color:var(--accent-color);">+ Neu...</option>`;
     
     let isMissing = selectedValue && !appModel.variables.includes(selectedValue) && !localVars.includes(selectedValue);
@@ -398,7 +654,7 @@ function createVariableDropdown(selectedValue, onChangeCallback, localVars = [])
 
     if (localVars.length > 0) {
         let optgroup = document.createElement('optgroup');
-        optgroup.label = "Lokale Variablen";
+        optgroup.label = "Lokale Variablen / Params";
         localVars.forEach(v => {
             let opt = document.createElement('option');
             opt.value = v;
@@ -411,13 +667,18 @@ function createVariableDropdown(selectedValue, onChangeCallback, localVars = [])
     
     sel.onchange = async (e) => {
         if (e.target.value === '__NEW__') {
-            e.target.value = selectedValue || ''; // Direkt zurücksetzen falls Dialog abgebrochen wird
-            let newVar = await promptNewVariable();
+            e.target.value = selectedValue || ''; // Fallback
+            let newVar = await promptNewVariable(localVars.length > 0);
             if (newVar) {
-                onChangeCallback(newVar);
+                if (localVars.length > 0) {
+                    // Locals werden vom Block-Callback in fModel eingefügt
+                } else {
+                    appModel.variables.push(newVar);
+                }
+                onChangeCallback(newVar, true);
             }
         } else {
-            onChangeCallback(e.target.value);
+            onChangeCallback(e.target.value, false);
         }
     };
     return sel;
@@ -456,7 +717,7 @@ function createDropZone(parentId, index) {
     dz.setAttribute('data-index', index);
     
     dz.addEventListener('dragover', e => { 
-        if (document.body.classList.contains('dragging-stmt')) {
+        if (document.body.classList.contains('dragging-stmt') && window.draggedNodeType !== 'FunctionDef') {
             e.preventDefault(); 
             e.stopPropagation(); 
             dz.classList.add('drag-over'); 
@@ -479,7 +740,6 @@ function createExpressionSlot(parentNode, propName, slotType, localVars = []) {
         condSlot.innerHTML = dictionary['drop_expr'][currentLang] || '...ablegen';
     }
     
-    // Unbedingtes DragOver Erlauben, damit Lücken auch überschrieben werden können.
     condSlot.addEventListener('dragover', e => { 
         if (window.draggedExprType === slotType) {
             e.preventDefault(); 
@@ -505,13 +765,24 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
     el.style.borderRadius = expType === 'boolean' ? '20px' : '6px';
     
     if (!exprNode.id) exprNode.id = genId('exp');
+    el.id = 'expr_' + exprNode.id;
     
     el.draggable = true;
     el.dataset.type = exprNode.type;
     el.addEventListener('dragstart', e => {
         e.stopPropagation();
-        e.dataTransfer.setData('application/json', JSON.stringify({ source: 'editor-expr', node: exprNode }));
-        setDragState(true, getExprType(exprNode.type));
+        
+        const rect = el.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
+        e.dataTransfer.setData('application/json', JSON.stringify({ 
+            source: 'editor-expr', 
+            node: exprNode,
+            offsetX: offsetX,
+            offsetY: offsetY
+        }));
+        setDragState(true, getExprType(exprNode.type), exprNode.type);
         setTimeout(() => { el.style.opacity = '0.3'; }, 0);
     });
 
@@ -530,7 +801,24 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
         if (exprNode.props.varName && !appModel.variables.includes(exprNode.props.varName) && !localVars.includes(exprNode.props.varName)) {
             el.classList.add('invalid-ref'); 
         }
-        el.appendChild(createVariableDropdown(exprNode.props.varName, e => { exprNode.props.varName = e; updateAllViews(); }, localVars));
+        el.setAttribute('data-var-name', exprNode.props.varName); // für Highlighting
+        el.appendChild(createVariableDropdown(exprNode.props.varName, (val, isNew) => { 
+            exprNode.props.varName = val;
+            if (isNew && localVars.length > 0) {
+                let funcId = getFunctionIdByInnerNode(exprNode.id);
+                if (funcId) {
+                    let fDef = appModel.floatingBlocks.find(b => b.node.id === funcId);
+                    if (fDef) {
+                        let fModel = appModel.functions.find(f => f.name === fDef.node.props.funcName);
+                        if (fModel) {
+                            if (!fModel.localVars) fModel.localVars = [];
+                            fModel.localVars.push(val);
+                        }
+                    }
+                }
+            }
+            updateAllViews(); 
+        }, localVars));
     } else if (exprNode.type === 'CallFunctionExpr') {
         if (exprNode.props.funcName && !appModel.functions.some(f => f.name === exprNode.props.funcName)) {
             el.classList.add('invalid-ref'); 
@@ -541,18 +829,17 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
             exprNode.props.funcName = e; 
             let f = appModel.functions.find(x => x.name === e);
             exprNode.args = {};
-            if(f) f.params.forEach(p => exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
+            if(f && f.params) f.params.forEach(p => exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
             updateAllViews();
         }));
         
         let fModel = appModel.functions.find(f => f.name === exprNode.props.funcName);
-        if (fModel && fModel.params.length > 0) {
+        if (fModel && fModel.params && fModel.params.length > 0) {
             if (!exprNode.args) exprNode.args = {};
             fModel.params.forEach(p => {
                 let pWrap = document.createElement('span');
                 pWrap.style.marginLeft = "5px";
                 pWrap.innerText = p + "=";
-                if (!exprNode.args[p]) exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' };
                 pWrap.appendChild(createExpressionSlot(exprNode.args, p, 'value', localVars));
                 el.appendChild(pWrap);
             });
@@ -592,18 +879,25 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
     return el;
 }
 
+function getFunctionIdByInnerNode(nodeId) {
+    for (let fb of appModel.floatingBlocks) {
+        if (fb.node.type === 'FunctionDef') {
+            if (fb.node.id === nodeId || findNodeById(fb.node, nodeId)) return fb.node.id;
+        }
+    }
+    return null;
+}
+
 function renderBlockEditor() {
     renderVariableList();
     renderFunctionList();
     const container = document.getElementById('blockEditor');
     container.innerHTML = '';
     
-    // Haupt-Baum rendern
     const rootWrapper = document.createElement('div');
     rootWrapper.appendChild(createVisualBlock(appModel.screens[0].layout, []));
     container.appendChild(rootWrapper);
 
-    // Frei platzierte (Floating) Blöcke rendern
     appModel.floatingBlocks.forEach((fb) => {
         const fbWrapper = document.createElement('div');
         fbWrapper.style.position = 'absolute';
@@ -613,12 +907,11 @@ function renderBlockEditor() {
         let locals = [];
         if (fb.node.type === 'FunctionDef') {
             let fModel = appModel.functions.find(f => f.name === fb.node.props.funcName);
-            if (fModel) locals = fModel.params;
+            if (fModel) locals = [...(fModel.params || []), ...(fModel.localVars || [])];
         }
 
         const blockEl = createVisualBlock(fb.node, locals);
         
-        // Entsättigung für alles, was keine Funktionsdefinition ist (da diese "verbunden" in sich selbst sind)
         if (fb.node.type !== 'FunctionDef') {
             blockEl.classList.add('disconnected');
         }
@@ -647,9 +940,26 @@ function createVisualBlock(node, localVars = []) {
         if (node.props.varName && !appModel.variables.includes(node.props.varName) && !localVars.includes(node.props.varName)) {
             block.classList.add('invalid-ref'); 
         }
+        block.setAttribute('data-var-name', node.props.varName); // für Highlighting
 
         header.innerHTML = `<span>${icon}</span> <span>Variable</span>`;
-        header.appendChild(createVariableDropdown(node.props.varName, e => { node.props.varName = e; updateAllViews(); }, localVars));
+        header.appendChild(createVariableDropdown(node.props.varName, (val, isNew) => { 
+            node.props.varName = val;
+            if (isNew && localVars.length > 0) {
+                let funcId = getFunctionIdByInnerNode(node.id);
+                if (funcId) {
+                    let fDef = appModel.floatingBlocks.find(b => b.node.id === funcId);
+                    if (fDef) {
+                        let fModel = appModel.functions.find(f => f.name === fDef.node.props.funcName);
+                        if (fModel) {
+                            if (!fModel.localVars) fModel.localVars = [];
+                            fModel.localVars.push(val);
+                        }
+                    }
+                }
+            }
+            updateAllViews(); 
+        }, localVars));
         let equals = document.createElement('span');
         equals.innerHTML = '=';
         equals.style.cssText = 'color:var(--text-main); font-weight:bold; margin: 0 5px;';
@@ -661,8 +971,62 @@ function createVisualBlock(node, localVars = []) {
     }
     else if (node.type === 'FunctionDef') {
         let fModel = appModel.functions.find(f => f.name === node.props.funcName);
-        let pStr = (fModel && fModel.params.length > 0) ? ` (${fModel.params.join(', ')})` : ` ()`;
+        let pStr = (fModel && fModel.params && fModel.params.length > 0) ? ` (${fModel.params.join(', ')})` : ` ()`;
         header.innerHTML = `<span>${icon}</span> <span>Funktion: <b>${node.props.funcName}${pStr}</b></span>`;
+        
+        if (fModel) {
+            let locContainer = document.createElement('div');
+            locContainer.className = 'local-vars-container';
+            
+            let title = document.createElement('div');
+            title.className = 'local-vars-title';
+            title.innerText = 'Lokale Vars & Params:';
+            
+            let btnAdd = document.createElement('button');
+            btnAdd.className = 'btn-add-local-var';
+            btnAdd.innerText = '+ Neu';
+            btnAdd.onclick = async (ev) => {
+                ev.stopPropagation();
+                let vName = await promptNewVariable(true);
+                if (vName) {
+                    if (!fModel.localVars) fModel.localVars = [];
+                    fModel.localVars.push(vName);
+                    updateAllViews();
+                }
+            };
+            title.appendChild(btnAdd);
+            locContainer.appendChild(title);
+            
+            let listEl = document.createElement('div');
+            let allLocals = [...(fModel.params || []), ...(fModel.localVars || [])];
+            
+            if (allLocals.length === 0) {
+                listEl.innerHTML = '<i>Keine</i>';
+            } else {
+                allLocals.forEach((v, idx) => {
+                    let span = document.createElement('span');
+                    span.className = 'sidebar-list-item';
+                    span.style.color = 'var(--accent-color)';
+                    span.style.fontWeight = 'bold';
+                    span.innerText = v;
+                    
+                    bindListHoverEvents(span, v);
+                    
+                    span.oncontextmenu = (ev) => {
+                        ev.preventDefault(); ev.stopPropagation(); hideAllMenus();
+                        currentListTarget = { type: 'local_var', name: v, funcName: fModel.name };
+                        const menu = document.getElementById('sidebarListMenu');
+                        menu.style.left = ev.pageX + 'px';
+                        menu.style.top = ev.pageY + 'px';
+                        menu.classList.add('active');
+                    };
+                    listEl.appendChild(span);
+                    if (idx < allLocals.length - 1) listEl.appendChild(document.createTextNode(', '));
+                });
+            }
+            locContainer.appendChild(listEl);
+            header.appendChild(locContainer);
+        }
     }
     else if (node.type === 'CallFunction') {
         if (node.props.funcName && !appModel.functions.some(f => f.name === node.props.funcName)) {
@@ -674,19 +1038,18 @@ function createVisualBlock(node, localVars = []) {
             node.props.funcName = e; 
             let f = appModel.functions.find(x => x.name === e);
             node.args = {};
-            if(f) f.params.forEach(p => node.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
+            if(f && f.params) f.params.forEach(p => node.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
             updateAllViews();
         }));
         
         let fModel = appModel.functions.find(f => f.name === node.props.funcName);
-        if (fModel && fModel.params.length > 0) {
+        if (fModel && fModel.params && fModel.params.length > 0) {
             if (!node.args) node.args = {};
             fModel.params.forEach(p => {
                 let pRow = document.createElement('div');
                 pRow.style.margin = "4px 10px";
                 pRow.style.display = "flex"; pRow.style.alignItems = "center";
                 pRow.innerHTML = `<span style="margin-right:6px; font-weight:500;">${p} = </span>`;
-                if (!node.args[p]) node.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' };
                 pRow.appendChild(createExpressionSlot(node.args, p, 'value', localVars));
                 header.appendChild(pRow);
             });
@@ -701,9 +1064,29 @@ function createVisualBlock(node, localVars = []) {
         block.draggable = true;
         block.addEventListener('dragstart', e => { 
             e.stopPropagation(); 
-            e.dataTransfer.setData('application/json', JSON.stringify({ source: 'editor', id: node.id })); 
-            setDragState(false, null);
-            setTimeout(() => { block.style.opacity = '0.3'; }, 0);
+            const rect = block.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+
+            e.dataTransfer.setData('application/json', JSON.stringify({ 
+                source: 'editor', 
+                id: node.id,
+                offsetX: offsetX,
+                offsetY: offsetY
+            })); 
+            setDragState(false, null, node.type);
+            
+            // Damit der vom Browser erstellte Screenshot (Ghost) im Drag in voller Stärke
+            // erscheint (und ohne gestrichelte Linien), entfernen wir die 'disconnected'-Klasse
+            // temporär genau im Moment des dragstart-Events.
+            let wasDisconnected = block.classList.contains('disconnected');
+            if(wasDisconnected) block.classList.remove('disconnected');
+            
+            // Danach (sofort im nächsten Frame) setzen wir das Original auf "dezent"
+            setTimeout(() => { 
+                if(wasDisconnected) block.classList.add('disconnected');
+                block.style.opacity = '0.3'; 
+            }, 0);
         });
         const delBtn = document.createElement('span'); delBtn.innerHTML = '✕';
         delBtn.style.cssText = 'cursor:pointer; margin-left:auto; color:#ef4444; font-size:14px; font-weight:bold; padding: 0 5px;';
@@ -838,7 +1221,6 @@ function handleBlockCtxAction(action) {
         if (currentBlockTarget.type === 'dropzone') {
             let parent = findNodeAnywhere(currentBlockTarget.parentId);
             if (parent && parent.children) {
-                // FunctionDef darf nicht in ein Statement!
                 if (nodeToPaste.type === 'FunctionDef') {
                     appModel.floatingBlocks.push({ x: 50, y: 50, node: nodeToPaste });
                 } else {
@@ -856,7 +1238,6 @@ function handleBlockCtxAction(action) {
     currentBlockTarget = null;
 }
 
-
 // ==========================================
 // RENDERING: HTML Emulator (AST Engine)
 // ==========================================
@@ -871,7 +1252,9 @@ function evaluateExpressionJS(exprNode, ctx, defaultReturn = true) {
         if (funcDef) {
             let tempCtx = { ...ctx };
             tempCtx._return = undefined;
-            // Argumente in die temporäre Umgebung schreiben
+            if (funcModel && funcModel.localVars) {
+                funcModel.localVars.forEach(lv => { tempCtx[lv] = 0; });
+            }
             if (funcModel && funcModel.params && exprNode.args) {
                 funcModel.params.forEach(p => {
                     tempCtx[p] = evaluateExpressionJS(exprNode.args[p], ctx, 0);
@@ -884,9 +1267,10 @@ function evaluateExpressionJS(exprNode, ctx, defaultReturn = true) {
                     buildHtmlNode(c, tempCtx, dummyFragment);
                 }
             }
-            // Variablenänderungen (nur von echten Variablen, nicht von Params) ins Original übernehmen
             Object.keys(tempCtx).forEach(k => { 
-                if(k !== '_return' && (!funcModel || !funcModel.params.includes(k))) {
+                let isParam = funcModel && funcModel.params && funcModel.params.includes(k);
+                let isLocal = funcModel && funcModel.localVars && funcModel.localVars.includes(k);
+                if(k !== '_return' && !isParam && !isLocal) {
                     ctx[k] = tempCtx[k]; 
                 }
             });
@@ -963,14 +1347,15 @@ function buildHtmlNode(node, ctx, parentFragment) {
             }
             limit++;
         }
-        if(limit >= 1000) console.warn("Emulator: Loop Limit erreicht (Endlosschleife?)");
     }
     else if (node.type === 'CallFunction') {
         let funcDef = appModel.floatingBlocks.find(fb => fb.node.type === 'FunctionDef' && fb.node.props.funcName === node.props.funcName);
         let funcModel = appModel.functions.find(f => f.name === node.props.funcName);
         if (funcDef) {
             let tempCtx = { ...ctx };
-            // Parameter setzen
+            if (funcModel && funcModel.localVars) {
+                funcModel.localVars.forEach(lv => { tempCtx[lv] = 0; });
+            }
             if (funcModel && funcModel.params && node.args) {
                 funcModel.params.forEach(p => {
                     tempCtx[p] = evaluateExpressionJS(node.args[p], ctx, 0);
@@ -983,7 +1368,9 @@ function buildHtmlNode(node, ctx, parentFragment) {
                 }
             }
             Object.keys(tempCtx).forEach(k => { 
-                if(k !== '_return' && (!funcModel || !funcModel.params.includes(k))) {
+                let isParam = funcModel && funcModel.params && funcModel.params.includes(k);
+                let isLocal = funcModel && funcModel.localVars && funcModel.localVars.includes(k);
+                if(k !== '_return' && !isParam && !isLocal) {
                     ctx[k] = tempCtx[k]; 
                 }
             });
@@ -1096,8 +1483,16 @@ function generateKotlinCode() {
         if (fb.node.type === 'FunctionDef') {
             let funcModel = appModel.functions.find(f => f.name === fb.node.props.funcName);
             let paramsCode = (funcModel && funcModel.params) ? funcModel.params.map(p => `${p}: Any`).join(", ") : "";
+            
+            let localVarsCode = "";
+            if (funcModel && funcModel.localVars) {
+                funcModel.localVars.forEach(lv => {
+                    localVarsCode += `    var ${lv} by mutableStateOf<Any>(0)\n`;
+                });
+            }
+
             let funcBody = buildComposeTree(fb.node, 4);
-            functionsCode += `@Composable\nfun ${fb.node.props.funcName}(${paramsCode}) : Any {\n${funcBody}    return 0\n}\n\n`;
+            functionsCode += `@Composable\nfun ${fb.node.props.funcName}(${paramsCode}) : Any {\n${localVarsCode}${funcBody}    return 0\n}\n\n`;
         }
     });
 
@@ -1181,9 +1576,13 @@ document.addEventListener('DOMContentLoaded', () => {
             let data = JSON.parse(e.dataTransfer.getData('application/json'));
             if (data.isExpr || data.source === 'editor-expr') { clearDragState(); return; }
             
+            // Abziehen der erfassten Offsets, um das Element präzise am Mauscursor zu platzieren
+            const offsetX = data.offsetX || 20;
+            const offsetY = data.offsetY || 20;
+
             const rect = blockEditor.getBoundingClientRect();
-            const x = e.clientX - rect.left + blockEditor.scrollLeft - 20;
-            const y = e.clientY - rect.top + blockEditor.scrollTop - 20;
+            const x = e.clientX - rect.left + blockEditor.scrollLeft - offsetX;
+            const y = e.clientY - rect.top + blockEditor.scrollTop - offsetY;
 
             if (data.source === 'sidebar') {
                 const newId = data.type.toLowerCase() + '_' + Date.now();
@@ -1196,11 +1595,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.type === 'Return') { newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' }; }
                 
                 if (data.type === 'SetVariable') { 
-                    // Auf dem Canvas-Root gibt es keine lokalen Variablen, nur Globale
                     let selectedVar = appModel.variables[0] || '';
                     if (!selectedVar) {
-                        selectedVar = await promptNewVariable();
+                        selectedVar = await promptNewVariable(false);
                         if (!selectedVar) { clearDragState(); return; }
+                        appModel.variables.push(selectedVar);
                     }
                     newNode.props = { varName: selectedVar };
                     newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' };

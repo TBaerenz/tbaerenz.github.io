@@ -65,7 +65,7 @@
         .nav-btn.active { color: var(--accent-color); }
         .side-content { width: 260px; display: flex; flex-direction: column; overflow-y: auto; overflow-x: auto; }
         .sidebar.collapsed .side-content { display: none; }
-        .panel-section { display: none; flex-direction: column; width: 100%; min-width: max-content; }
+        .panel-section { display: none; flex-direction: column; width: 100%; min-width: max-content; height: 100%; }
         .panel-section.active { display: flex; }
         .panel-title-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--bg-panel); z-index: 5;}
         .panel-title { font-weight: bold; font-size: 12px; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
@@ -165,18 +165,44 @@
         /* Disconnected (Free-Floating) Modifier */
         .visual-block.disconnected { filter: saturate(0.5) opacity(0.85); border: 2px dashed var(--border-color); box-shadow: none; }
 
+        /* Lokale Variablen Header in Funktionen */
+        .local-vars-container { margin: 10px 0 5px 0; padding: 10px; background: rgba(0,0,0,0.03); border: 1px dashed var(--border-color); border-radius: 6px; font-size: 12px; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+        [data-theme="dark"] .local-vars-container { background: rgba(255,255,255,0.03); }
+        .local-vars-title { font-weight: bold; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
+        .btn-add-local-var { font-size: 11px; padding: 2px 6px; border: 1px dashed var(--accent-color); background: transparent; color: var(--accent-color); border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .btn-add-local-var:hover { background: var(--accent-color); color: #fff; }
+
         /* Highlight Missing Reference (Red) */
         .invalid-ref { border: 2px solid #ef4444 !important; background-color: rgba(239, 68, 68, 0.1) !important; }
         .invalid-ref > .visual-block-header { color: #ef4444 !important; }
         .invalid-ref.expr-block { color: #ef4444 !important; }
         .invalid-ref .block-control { border-color: #ef4444 !important; color: #ef4444 !important; }
 
-        /* Animation für Highlighted Block (bei Klick auf Fkt-Name) */
-        @keyframes blink {
-            0%, 100% { border-color: var(--border-color); box-shadow: none; }
-            50% { border-color: var(--accent-color); box-shadow: 0 0 10px var(--accent-color); transform: scale(1.02); }
-        }
-        .blink-highlight { animation: blink 0.5s ease-in-out 3; }
+        /* Usage Highlighting on Hover */
+        .highlight-first { border: 2px solid #3b82f6 !important; box-shadow: 0 0 12px rgba(59, 130, 246, 0.8) !important; background-color: rgba(59, 130, 246, 0.15) !important; transition: 0.2s; }
+        .highlight-sub { border: 2px solid #93c5fd !important; box-shadow: 0 0 6px rgba(147, 197, 253, 0.4) !important; background-color: rgba(147, 197, 253, 0.1) !important; transition: 0.2s; }
+
+        /* Status Overlay (Canvas Badges) */
+        .status-overlay { position: absolute; top: 15px; right: 25px; display: flex; gap: 10px; z-index: 100; pointer-events: auto; }
+        .status-badge { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; background: var(--bg-panel); border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.1); user-select: none; transition: 0.2s; }
+        .status-badge:hover { filter: brightness(0.95); transform: translateY(-1px); }
+        .error-badge { color: #ef4444; border-color: rgba(239,68,68,0.4); } .error-badge svg { stroke: #ef4444; }
+        .warning-badge { color: #eab308; border-color: rgba(234,179,8,0.4); } .warning-badge svg { stroke: #eab308; }
+        
+        /* Liste der Probleme im Panel */
+        .status-item { padding: 10px 15px; font-size: 13px; border-bottom: 1px solid var(--border-color); cursor: default; line-height: 1.4; color: var(--text-main); }
+        .status-item:last-child { border-bottom: none; }
+        .status-item.error { border-left: 4px solid #ef4444; }
+        .status-item.warning { border-left: 4px solid #eab308; }
+        .status-item:hover { background: rgba(0,0,0,0.03); }
+        [data-theme="dark"] .status-item:hover { background: rgba(255,255,255,0.03); }
+
+        /* Animation für Highlighted Block (bei Klick auf Fkt-Name oder Hover auf Fehler) */
+        @keyframes blink { 0%, 100% { box-shadow: none; } 50% { box-shadow: 0 0 12px var(--accent-color); transform: scale(1.02); } }
+        .blink-highlight { animation: blink 0.5s ease-in-out 3; border-color: var(--accent-color) !important; }
+        
+        @keyframes pulse-error { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+        .error-pulse { animation: pulse-error 1.5s infinite; border: 2px solid #ef4444 !important; }
 
         /* EINHEITLICHES DESIGN für alle Dropdowns und Textfelder */
         .block-control {
@@ -432,6 +458,19 @@
         <div class="main-area">
             <div class="editor-tabs hidden" id="editorTabs"></div>
             <div class="canvas mode-code" id="mainCanvas">
+                
+                <!-- Status Overlay (Canvas Badges) -->
+                <div class="status-overlay" id="statusOverlay" style="display: none;">
+                    <div class="status-badge error-badge" id="errorBadge" style="display: none;" onclick="toggleRightPanel('problems')">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span id="errorCount">0</span>
+                    </div>
+                    <div class="status-badge warning-badge" id="warningBadge" style="display: none;" onclick="toggleRightPanel('problems')">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <span id="warningCount">0</span>
+                    </div>
+                </div>
+
                 <textarea class="code-editor" id="codeEditor" spellcheck="false"></textarea>
                 <div class="block-editor" id="blockEditor"></div>
             </div>
@@ -452,13 +491,27 @@
 
         <aside class="sidebar sidebar-right" id="sidebarRight">
             <div class="side-nav">
-                <button class="nav-btn active" id="btn-emulator" onclick="toggleRightPanel()"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect></svg></button>
+                <button class="nav-btn active" id="btn-emulator" onclick="toggleRightPanel('emulator')" title="Emulator"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect></svg></button>
+                <button class="nav-btn" id="btn-problems" onclick="toggleRightPanel('problems')" title="Fehler & Warnungen"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></button>
             </div>
             <div class="side-content" id="contentRight">
-                <div class="panel-title-bar"><span class="panel-title" data-i18n="emulator_title">Live Emulator</span></div>
-                <div class="emulator-wrapper">
-                    <div class="phone-emulator"><div class="phone-screen" id="phoneScreen">App Preview</div></div>
+                
+                <!-- EMULATOR PANEL -->
+                <div class="panel-section active" id="panel-emulator">
+                    <div class="panel-title-bar"><span class="panel-title" data-i18n="emulator_title">Live Emulator</span></div>
+                    <div class="emulator-wrapper">
+                        <div class="phone-emulator"><div class="phone-screen" id="phoneScreen">App Preview</div></div>
+                    </div>
                 </div>
+
+                <!-- PROBLEMS PANEL -->
+                <div class="panel-section" id="panel-problems">
+                    <div class="panel-title-bar"><span class="panel-title" data-i18n="problems_title">Fehler & Warnungen</span></div>
+                    <div id="problemsList" style="padding: 10px; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; height: 100%;">
+                        <div style="padding: 15px; color: var(--text-muted); font-size: 12px;" data-i18n="no_problems">Keine Probleme gefunden.</div>
+                    </div>
+                </div>
+                
             </div>
         </aside>
     </main>
