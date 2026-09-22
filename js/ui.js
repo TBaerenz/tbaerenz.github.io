@@ -9,19 +9,32 @@ const dictionary = {
     'menu_view_code': { de: 'Text-Editor (Code)', en: 'Text Editor (Code)' },
     'menu_view_theme': { de: 'Dark / Light Mode wechseln', en: 'Toggle Dark / Light Mode' },
     'menu_view_palette': { de: 'Farbpalette wählen...', en: 'Choose Color Palette...' },
-    'panel_blocks': { de: 'UI Elemente (Drag)', en: 'UI Elements (Drag)' },
+    'panel_blocks': { de: 'Logic & UI (Drag)', en: 'Logic & UI (Drag)' },
     'panel_files': { de: 'Projektdateien', en: 'Project Files' },
+    'ui_screen': { de: 'Screen:', en: 'Screen:' },
+    'ui_elements_title': { de: 'Bestehende UI', en: 'Existing UI' },
+    'btn_goto_ui': { de: 'Zu bestehenden UI Elementen', en: 'Go to existing UI elements' },
     
-    'cat_control': { de: 'Container & Layout', en: 'Container & Layout' },
+    'cat_ui_drag': { de: 'UI (in den Emulator ziehen!)', en: 'UI (Drag into Emulator!)' },
     'cat_logic': { de: 'Logik & Schleifen', en: 'Logic & Loops' },
     'cat_vars': { de: 'Variablen', en: 'Variables' },
     'cat_functions': { de: 'Funktionen', en: 'Functions' },
+    'cat_math': { de: 'Mathematik', en: 'Math' },
+    'cat_screens': { de: 'Screens & Navigation', en: 'Screens & Navigation' },
     
-    'block_scaffold': { de: 'Scaffold Container', en: 'Scaffold Container' },
-    'block_greeting': { de: 'Text (Greeting)', en: 'Text (Greeting)' },
+    'block_textlabel': { de: 'Textanzeige (Label)', en: 'Text Display (Label)' },
+    'block_button': { de: 'Button (Klick)', en: 'Button (Click)' },
+    'block_textfield': { de: 'Eingabefeld (TextField)', en: 'Input Field (TextField)' },
+    'block_column': { de: 'Spalte (Column)', en: 'Column' },
+    'block_row': { de: 'Zeile (Row)', en: 'Row' },
+    
     'block_if': { de: 'If (Bedingung)', en: 'If (Condition)' },
     'block_loop': { de: 'Schleife (Solange...)', en: 'Loop (While...)' },
+    'block_for': { de: 'Zähler-Schleife (For)', en: 'Count-Loop (For)' },
+    'block_foreach': { de: 'Listen-Schleife (ForEach)', en: 'List-Loop (ForEach)' },
     'block_boolean': { de: 'Wahr / Falsch', en: 'True / False' },
+    'block_not': { de: 'Nicht (NOT)', en: 'Not (NOT)' },
+    'block_string': { de: 'Text (String)', en: 'Text (String)' },
     'block_number': { de: 'Zahl (123)', en: 'Number (123)' },
     'block_comparison': { de: 'Vergleich (=, >)', en: 'Comparison (=, >)' },
     'block_and': { de: 'Und (AND)', en: 'And (AND)' },
@@ -32,6 +45,18 @@ const dictionary = {
     'block_call_func_expr': { de: 'Funktion (Wert)', en: 'Function (Value)' },
     'block_return': { de: 'Return (Rückgabe)', en: 'Return (Value)' },
     
+    'block_math_op': { de: 'Grundrechenarten (+, -)', en: 'Basic Math (+, -)' },
+    'block_math_random': { de: 'Zufallszahl', en: 'Random Number' },
+    'block_math_compare': { de: 'Min / Max / Avg (2 Werte)', en: 'Min / Max / Avg (2 values)' },
+    'block_math_list': { de: 'Min / Max / Avg (Liste)', en: 'Min / Max / Avg (List)' },
+    'block_math_func': { de: 'Wurzel, Log, ...', en: 'Sqrt, Log, ...' },
+    'block_math_trig': { de: 'Sin, Cos, Tan', en: 'Sin, Cos, Tan' },
+
+    'block_open_screen': { de: 'Screen öffnen', en: 'Open Screen' },
+    'block_close_screen': { de: 'Screen schließen (Zurück)', en: 'Close Screen (Back)' },
+    'block_exit_app': { de: 'App beenden', en: 'Exit App' },
+    'block_get_screen_arg': { de: 'Screen Argument (Wert)', en: 'Screen Argument (Value)' },
+
     'btn_new_var': { de: '+ Neue Variable', en: '+ New Variable' },
     'prompt_new_var': { de: 'Name der neuen Variable:', en: 'Name of new variable:' },
     'prompt_new_local_var': { de: 'Name der neuen lokalen Variable:', en: 'Name of new local variable:' },
@@ -71,7 +96,9 @@ const dictionary = {
     'btn_cancel': { de: 'Abbrechen', en: 'Cancel' }, 'btn_ok': { de: 'OK', en: 'OK' },
     'err_empty_name': { de: 'Der Name darf nicht leer sein.', en: 'Name cannot be empty.' },
     'err_invalid_name': { de: 'Punkte (.) und Sonderzeichen sind nicht erlaubt.', en: 'Dots (.) and special characters are not allowed.' },
-    'err_name_exists': { de: 'Dieser Name (Variable/Funktion) existiert bereits.', en: 'This name (variable/function) already exists.' },
+    'err_name_exists': { de: 'Dieser Name existiert bereits.', en: 'This name already exists.' },
+    
+    'prompt_new_screen': { de: 'Name des neuen Screens:', en: 'Name of new screen:' },
     
     'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
     'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
@@ -154,6 +181,7 @@ const viewMenu = document.getElementById('viewMenu');
 const fileMenuDropdown = document.getElementById('fileMenuDropdown');
 const blockContextMenu = document.getElementById('blockContextMenu');
 const sidebarListMenu = document.getElementById('sidebarListMenu');
+const uiElementListMenu = document.getElementById('uiElementListMenu');
 
 function hideAllMenus() { 
     contextMenu.classList.remove('active'); 
@@ -162,6 +190,7 @@ function hideAllMenus() {
     fileMenuDropdown.classList.remove('active'); 
     if (blockContextMenu) blockContextMenu.classList.remove('active');
     if (sidebarListMenu) sidebarListMenu.classList.remove('active');
+    if (uiElementListMenu) uiElementListMenu.classList.remove('active');
 }
 function showFileMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); fileMenuDropdown.style.left = rect.left + 'px'; fileMenuDropdown.style.top = (rect.bottom + 10) + 'px'; fileMenuDropdown.classList.add('active'); }
 function showViewMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); viewMenu.style.left = rect.left + 'px'; viewMenu.style.top = (rect.bottom + 10) + 'px'; viewMenu.classList.add('active'); }
@@ -177,16 +206,22 @@ function toggleLeftPanel(panelId) {
 }
 
 function switchLeftTab(panelId) {
-    document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active');
-    document.getElementById('panel-blocks').classList.remove('active'); document.getElementById('panel-files').classList.remove('active');
-    document.getElementById(`btn-${panelId}`).classList.add('active'); document.getElementById(`panel-${panelId}`).classList.add('active');
+    document.getElementById('btn-blocks').classList.remove('active'); 
+    document.getElementById('btn-uielements').classList.remove('active'); 
+    document.getElementById('btn-files').classList.remove('active');
+    
+    document.getElementById('panel-blocks').classList.remove('active'); 
+    document.getElementById('panel-uielements').classList.remove('active'); 
+    document.getElementById('panel-files').classList.remove('active');
+    
+    document.getElementById(`btn-${panelId}`).classList.add('active'); 
+    document.getElementById(`panel-${panelId}`).classList.add('active');
 }
 
 function toggleRightPanel(panelId) {
     if (sidebarRight.classList.contains('collapsed')) { 
         sidebarRight.classList.remove('collapsed'); 
         switchRightTab(panelId);
-        // Falls die Breite vorher 0 war (durch Resizer), wiederherstellen
         if(document.getElementById('contentRight').getBoundingClientRect().width < 50) {
             document.getElementById('contentRight').style.width = '280px';
         }
@@ -204,6 +239,7 @@ function toggleRightPanel(panelId) {
 function switchRightTab(panelId) {
     document.getElementById('btn-emulator').classList.remove('active');
     document.getElementById('btn-problems').classList.remove('active');
+    
     document.getElementById('panel-emulator').classList.remove('active');
     document.getElementById('panel-problems').classList.remove('active');
 
@@ -233,9 +269,8 @@ function initResizer(rId, pId, dir, rev, cId, cb) {
     function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.cursor = 'default'; document.body.classList.remove('is-resizing'); }
 }
 
-initResizer('resizerLeft', 'contentLeft', 'x', false, 'sidebarLeft', o => { if(o && !document.getElementById('btn-blocks').classList.contains('active') && !document.getElementById('btn-files').classList.contains('active')) switchLeftTab('blocks'); else if(!o) { document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active'); } });
+initResizer('resizerLeft', 'contentLeft', 'x', false, 'sidebarLeft', o => { if(o && !document.getElementById('btn-blocks').classList.contains('active') && !document.getElementById('btn-files').classList.contains('active') && !document.getElementById('btn-uielements').classList.contains('active')) switchLeftTab('blocks'); else if(!o) { document.getElementById('btn-blocks').classList.remove('active'); document.getElementById('btn-files').classList.remove('active'); document.getElementById('btn-uielements').classList.remove('active'); } });
 
-// Anpassung für Resizer Rechts (mit 2 Tabs)
 initResizer('resizerRight', 'contentRight', 'x', true, 'sidebarRight', o => { 
     if(o && !document.getElementById('btn-emulator').classList.contains('active') && !document.getElementById('btn-problems').classList.contains('active')) {
         switchRightTab('emulator'); 

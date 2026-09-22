@@ -14,34 +14,41 @@ let clipboard = null;
 let currentContextTarget = null;
 let currentLang = 'de';
 
-let blockClipboard = null; // Zwischenablage für das visuelle Block-System
+let blockClipboard = null; 
+
+// Initialize Global Emulator State
+window.emulatorScreenArg = "";
 
 function getDefaultAppModel() {
     return {
         metadata: { appName: "MyApplication", packageName: "com.example.myapplication" },
         variables: [], 
         functions: [],
-        floatingBlocks: [], // Lose platzierte Blöcke {x: 0, y: 0, node: {...}}
+        activeScreenId: "MainActivity",
         screens: [{
             id: "MainActivity",
-            layout: {
-                type: "Scaffold", id: "root_scaffold", props: {},
+            uiTree: {
+                type: "Column", id: "root_col", props: {},
                 children: [
-                    { type: "Greeting", id: "greet_1", props: { name: "Android" } }
+                    { type: "TextLabel", id: "lbl_1", props: { text: "Willkommen in der App!" } }
                 ]
-            }
+            },
+            floatingBlocks: []
         }]
     };
 }
 
 let appModel = getDefaultAppModel();
 
+function getActiveScreen() {
+    return appModel.screens.find(s => s.id === appModel.activeScreenId) || appModel.screens[0];
+}
+
 // ==========================================
 // HILFSFUNKTIONEN
 // ==========================================
 function genId(prefix) { return prefix + '_' + Date.now() + Math.floor(Math.random() * 1000); }
 
-// Tiefe Kopie eines Blocks, wobei für jedes Element neue IDs generiert werden
 function deepCloneNodeWithNewIds(node) {
     if (!node || typeof node !== 'object') return node;
     let clone = Array.isArray(node) ? [] : {};
@@ -60,19 +67,41 @@ function deepCloneNodeWithNewIds(node) {
 function findNodeById(current, id) {
     if (!current) return null;
     if (current.id === id) return current;
+    
     if (current.children) {
         for (let child of current.children) {
             let found = findNodeById(child, id);
             if (found) return found;
         }
     }
+    
+    if (current.elseIfs) {
+        for (let elif of current.elseIfs) {
+            if (elif.id === id) return elif;
+            if (elif.children) {
+                for (let child of elif.children) {
+                    let found = findNodeById(child, id);
+                    if (found) return found;
+                }
+            }
+        }
+    }
+    
+    if (current.elseBranch) {
+        if (current.elseBranch.id === id) return current.elseBranch;
+        if (current.elseBranch.children) {
+            for (let child of current.elseBranch.children) {
+                let found = findNodeById(child, id);
+                if (found) return found;
+            }
+        }
+    }
+    
     return null;
 }
 
 function findNodeAnywhere(id) {
-    let found = findNodeById(appModel.screens[0].layout, id);
-    if (found) return found;
-    for (let fb of appModel.floatingBlocks) {
+    for (let fb of getActiveScreen().floatingBlocks) {
         if (fb.node.id === id) return fb.node;
         let inner = findNodeById(fb.node, id);
         if (inner) return inner;
@@ -81,27 +110,49 @@ function findNodeAnywhere(id) {
 }
 
 function removeNodeById(current, id) {
-    if (!current || !current.children) return null;
-    for (let i = 0; i < current.children.length; i++) {
-        if (current.children[i].id === id) {
-            return current.children.splice(i, 1)[0];
-        } else {
-            let found = removeNodeById(current.children[i], id);
+    if (!current) return null;
+    
+    if (current.children) {
+        for (let i = 0; i < current.children.length; i++) {
+            if (current.children[i].id === id) {
+                return current.children.splice(i, 1)[0];
+            } else {
+                let found = removeNodeById(current.children[i], id);
+                if (found) return found;
+            }
+        }
+    }
+    
+    if (current.elseIfs) {
+        for (let elif of current.elseIfs) {
+            if (elif.children) {
+                for (let i = 0; i < elif.children.length; i++) {
+                    if (elif.children[i].id === id) return elif.children.splice(i, 1)[0];
+                    let found = removeNodeById(elif.children[i], id);
+                    if (found) return found;
+                }
+            }
+        }
+    }
+    
+    if (current.elseBranch && current.elseBranch.children) {
+        for (let i = 0; i < current.elseBranch.children.length; i++) {
+            if (current.elseBranch.children[i].id === id) return current.elseBranch.children.splice(i, 1)[0];
+            let found = removeNodeById(current.elseBranch.children[i], id);
             if (found) return found;
         }
     }
+    
     return null;
 }
 
 function extractNodeFromAnywhere(id) {
-    let found = removeNodeById(appModel.screens[0].layout, id);
-    if (found) return found;
-
-    for (let i = 0; i < appModel.floatingBlocks.length; i++) {
-        if (appModel.floatingBlocks[i].node.id === id) {
-            return appModel.floatingBlocks.splice(i, 1)[0].node;
+    let screen = getActiveScreen();
+    for (let i = 0; i < screen.floatingBlocks.length; i++) {
+        if (screen.floatingBlocks[i].node.id === id) {
+            return screen.floatingBlocks.splice(i, 1)[0].node;
         } else {
-            let inner = removeNodeById(appModel.floatingBlocks[i].node, id);
+            let inner = removeNodeById(screen.floatingBlocks[i].node, id);
             if (inner) return inner;
         }
     }
@@ -110,7 +161,7 @@ function extractNodeFromAnywhere(id) {
 
 function removeExpressionById(current, id) {
     if (!current) return false;
-    let props = ['condition', 'value', 'left', 'right'];
+    let props = ['condition', 'value', 'left', 'right', 'min', 'max', 'list', 'start', 'end', 'step', 'textExpr', 'arg']; 
     for (let p of props) {
         if (current[p] && typeof current[p] === 'object') {
             if (current[p].id === id) {
@@ -120,11 +171,27 @@ function removeExpressionById(current, id) {
             if (removeExpressionById(current[p], id)) return true;
         }
     }
+    
     if (current.children) {
         for (let child of current.children) {
             if (removeExpressionById(child, id)) return true;
         }
     }
+    if (current.elseIfs) {
+        for (let elif of current.elseIfs) {
+            if (elif.condition && typeof elif.condition === 'object') {
+                if (elif.condition.id === id) { elif.condition = null; return true; }
+                if (removeExpressionById(elif.condition, id)) return true;
+            }
+            if (elif.children) {
+                for (let child of elif.children) { if (removeExpressionById(child, id)) return true; }
+            }
+        }
+    }
+    if (current.elseBranch && current.elseBranch.children) {
+        for (let child of current.elseBranch.children) { if (removeExpressionById(child, id)) return true; }
+    }
+    
     return false;
 }
 
