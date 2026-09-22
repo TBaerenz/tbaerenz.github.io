@@ -8,7 +8,6 @@ const dictionary = {
     'menu_view_block': { de: 'Block-Editor (Visuell)', en: 'Block Editor (Visual)' },
     'menu_view_code': { de: 'Text-Editor (Code)', en: 'Text Editor (Code)' },
     'menu_view_theme': { de: 'Dark / Light Mode wechseln', en: 'Toggle Dark / Light Mode' },
-    'menu_view_palette': { de: 'Farbpalette wählen...', en: 'Choose Color Palette...' },
     'panel_blocks': { de: 'Logic & UI (Drag)', en: 'Logic & UI (Drag)' },
     'panel_files': { de: 'Projektdateien', en: 'Project Files' },
     'ui_screen': { de: 'Screen:', en: 'Screen:' },
@@ -100,11 +99,6 @@ const dictionary = {
     
     'prompt_new_screen': { de: 'Name des neuen Screens:', en: 'Name of new screen:' },
     
-    'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
-    'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
-    'color_emerald': { de: 'Emerald Green', en: 'Emerald Green' },
-    'color_amethyst': { de: 'Amethyst Purple', en: 'Amethyst Purple' },
-    
     'prompt_new_project_warn': { de: 'Achtung: Alle nicht gespeicherten Änderungen werden verworfen. Fortfahren?', en: 'Warning: All unsaved changes will be lost. Continue?' },
     'btn_clear': { de: 'Leeren', en: 'Clear' },
 };
@@ -118,7 +112,6 @@ function toggleLanguage() {
 }
 
 function toggleTheme() { const htmlTag = document.documentElement; htmlTag.setAttribute('data-theme', htmlTag.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); hideAllMenus(); }
-function applyColorPalette(colorName) { document.documentElement.setAttribute('data-color', colorName); hideAllMenus(); }
 
 function validateName(name) {
     if (!name || name.trim() === '') return 'err_empty_name';
@@ -181,7 +174,6 @@ const viewMenu = document.getElementById('viewMenu');
 const fileMenuDropdown = document.getElementById('fileMenuDropdown');
 const blockContextMenu = document.getElementById('blockContextMenu');
 const sidebarListMenu = document.getElementById('sidebarListMenu');
-const uiElementListMenu = document.getElementById('uiElementListMenu');
 
 function hideAllMenus() { 
     contextMenu.classList.remove('active'); 
@@ -190,7 +182,6 @@ function hideAllMenus() {
     fileMenuDropdown.classList.remove('active'); 
     if (blockContextMenu) blockContextMenu.classList.remove('active');
     if (sidebarListMenu) sidebarListMenu.classList.remove('active');
-    if (uiElementListMenu) uiElementListMenu.classList.remove('active');
 }
 function showFileMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); fileMenuDropdown.style.left = rect.left + 'px'; fileMenuDropdown.style.top = (rect.bottom + 10) + 'px'; fileMenuDropdown.classList.add('active'); }
 function showViewMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); viewMenu.style.left = rect.left + 'px'; viewMenu.style.top = (rect.bottom + 10) + 'px'; viewMenu.classList.add('active'); }

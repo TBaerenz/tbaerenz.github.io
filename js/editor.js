@@ -101,7 +101,7 @@ function switchScreen(screenId, arg = "") {
     }
 }
 
-async function promptNewScreen() {
+window.promptNewScreen = async function() {
     let name = await openModal({ 
         title: 'Neuer Screen', 
         message: dictionary['prompt_new_screen'][currentLang] || 'Name des neuen Screens:', 
@@ -121,7 +121,7 @@ async function promptNewScreen() {
         appModel.activeScreenId = name;
         updateAllViews();
     }
-}
+};
 
 window.deleteCurrentScreen = async function() {
     if(appModel.screens.length <= 1) {
@@ -138,7 +138,7 @@ window.deleteCurrentScreen = async function() {
         appModel.activeScreenId = appModel.screens[0].id;
         updateAllViews();
     }
-}
+};
 
 // ==========================================
 // HIGHLIGHTING (Laufzeit-basiert)
@@ -150,7 +150,6 @@ window.highlightVar = function(varName) {
     window.unhighlightVar();
     if (!varName) return;
     
-    // Highlight Code-Blöcke
     let order = window.currentAnalysis.varUsageOrder[varName] || [];
     order.forEach((id, idx) => {
         let el = document.getElementById('block_' + id) || document.getElementById('expr_' + id);
@@ -160,11 +159,9 @@ window.highlightVar = function(varName) {
         }
     });
 
-    // Highlight in Emulator UI
     let uiEls = document.querySelectorAll(`[data-ui-id="${varName}"]`);
     uiEls.forEach(el => el.classList.add('ui-highlight'));
     
-    // Highlight Sidebar List
     let listEl = document.querySelector(`[data-sidebar-ui-id="${varName}"]`);
     if(listEl) listEl.classList.add('ui-highlight-list');
 };
@@ -219,7 +216,6 @@ function analyzeAST() {
     function traverse(node, ctx) {
         if (!node || typeof node !== 'object') return;
 
-        // UI Interactions also add usage logic for highlighting
         if (node.type === 'SetUIProperty') {
             if(node.props.targetId) addUsage(node.props.targetId, node.id);
             if (node.value) traverse(node.value, ctx);
@@ -666,16 +662,16 @@ async function promptNewVariable(isLocal = false) {
     return varName;
 }
 
-async function createNewVariable() {
+window.createNewVariable = async function() {
     let v = await promptNewVariable(false);
     if (v) {
         appModel.variables.push(v);
         logToConsole((dictionary['prompt_var_success'][currentLang] || 'Variable erstellt: ') + v);
         updateAllViews();
     }
-}
+};
 
-async function createNewFunction() {
+window.createNewFunction = async function() {
     let funcName = await openModal({
         title: dictionary['btn_new_func'][currentLang],
         message: dictionary['prompt_new_func'][currentLang],
@@ -709,7 +705,7 @@ async function createNewFunction() {
     
     logToConsole((dictionary['prompt_func_success'][currentLang] || 'Funktion erstellt: ') + funcName + "(" + params.join(", ") + ")");
     updateAllViews();
-}
+};
 
 async function editFunctionParams(funcName) {
     let func = appModel.functions.find(f => f.name === funcName);
@@ -864,17 +860,7 @@ function handleListCtxAction(action) {
     currentListTarget = null;
 }
 
-window.handleUIElementAction = function(action) {
-    hideAllMenus();
-    if(!currentListTarget) return;
-    if(action === 'rename' && currentListTarget.type === 'ui_element') {
-        renameUIElement(currentListTarget.id);
-    } else if (action === 'delete' && currentListTarget.type === 'ui_element') {
-        deleteUIElement(currentListTarget.id, null);
-    }
-}
-
-async function renameUIElement(oldId) {
+window.renameUIElement = async function(oldId) {
     let newId = await openModal({
         title: dictionary['ctx_rename'][currentLang],
         message: 'Neue ID für UI Element:',
@@ -925,6 +911,27 @@ async function renameUIElement(oldId) {
     if(tempVal1 !== undefined) { window.emulatorCtx[newId + "_text"] = tempVal1; delete window.emulatorCtx[oldId + "_text"]; }
     if(tempVal2 !== undefined) { window.emulatorCtx[newId + "_label"] = tempVal2; delete window.emulatorCtx[oldId + "_label"]; }
 
+    updateAllViews();
+}
+
+window.deleteUIElement = function(id, e) {
+    if(e) e.stopPropagation();
+    let activeScreen = getActiveScreen();
+    function removeUI(node) {
+        if(!node || !node.children) return false;
+        for(let i=0; i<node.children.length; i++) {
+            if(node.children[i].id === id) {
+                node.children.splice(i, 1);
+                return true;
+            }
+            if(removeUI(node.children[i])) return true;
+        }
+        return false;
+    }
+    removeUI(activeScreen.uiTree);
+    
+    activeScreen.floatingBlocks = activeScreen.floatingBlocks.filter(fb => !(fb.node.type === 'UIEvent' && fb.node.props.sourceId === id));
+    
     updateAllViews();
 }
 
@@ -1152,7 +1159,7 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
                 pRow.style.margin = "4px 10px";
                 pRow.style.display = "flex"; pRow.style.alignItems = "center";
                 pRow.innerHTML = `<span style="margin-right:6px; font-weight:500;">${p} = </span>`;
-                pRow.appendChild(createExpressionSlot(node.args, p, 'value', localVars));
+                pRow.appendChild(createExpressionSlot(exprNode.args, p, 'value', localVars));
                 el.appendChild(pRow);
             });
         }
@@ -1254,7 +1261,6 @@ function createExpressionBlock(exprNode, parentNode, propertyName, localVars = [
         el.appendChild(document.createTextNode('Screen Argument'));
     }
 
-    // Lösch-Button ("X")
     const delBtn = document.createElement('span');
     delBtn.innerHTML = '✕';
     delBtn.style.cssText = 'cursor:pointer; margin-left:8px; color:#ef4444; font-size:14px; font-weight:bold; padding: 2px 5px; border-radius: 4px; display:flex; align-items:center; justify-content:center; transition: 0.2s;';
@@ -1341,14 +1347,6 @@ function renderUIElementsPanel() {
         summary.innerHTML = `${icon} <span style="font-family:monospace; margin-left:5px;">${el.id}</span> (${el.type})`;
         
         bindListHoverEvents(summary, el.id);
-        summary.oncontextmenu = (e) => {
-            e.preventDefault(); e.stopPropagation(); hideAllMenus();
-            currentListTarget = { type: 'ui_element', id: el.id };
-            const menu = document.getElementById('uiElementListMenu');
-            menu.style.left = e.pageX + 'px';
-            menu.style.top = e.pageY + 'px';
-            menu.classList.add('active');
-        };
         details.appendChild(summary);
 
         let cmds = document.createElement('div');
@@ -1392,30 +1390,35 @@ function renderUIElementsPanel() {
             cmds.appendChild(hint);
         }
         
+        // Inline Buttons für Rename und Delete
+        let actionsRow = document.createElement('div');
+        actionsRow.style.cssText = 'display:flex; gap:5px; margin-top:5px;';
+        
+        let btnRename = document.createElement('button');
+        btnRename.className = 'btn-add-var';
+        btnRename.style.flex = "1";
+        btnRename.style.padding = "4px";
+        btnRename.innerText = dictionary['ctx_rename'][currentLang];
+        btnRename.onclick = (e) => { e.stopPropagation(); window.renameUIElement(el.id); };
+        
+        let btnDelete = document.createElement('button');
+        btnDelete.className = 'btn-add-var';
+        btnDelete.style.flex = "1";
+        btnDelete.style.padding = "4px";
+        btnDelete.style.color = '#ef4444';
+        btnDelete.style.borderColor = 'rgba(239,68,68,0.3)';
+        btnDelete.innerText = dictionary['ctx_delete'][currentLang];
+        btnDelete.onmouseenter = () => btnDelete.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+        btnDelete.onmouseleave = () => btnDelete.style.backgroundColor = "transparent";
+        btnDelete.onclick = (e) => { e.stopPropagation(); window.deleteUIElement(el.id, e); };
+        
+        actionsRow.appendChild(btnRename);
+        actionsRow.appendChild(btnDelete);
+        cmds.appendChild(actionsRow);
+        
         details.appendChild(cmds);
         list.appendChild(details);
     });
-}
-
-window.deleteUIElement = function(id, e) {
-    if(e) e.stopPropagation();
-    let activeScreen = getActiveScreen();
-    function removeUI(node) {
-        if(!node || !node.children) return false;
-        for(let i=0; i<node.children.length; i++) {
-            if(node.children[i].id === id) {
-                node.children.splice(i, 1);
-                return true;
-            }
-            if(removeUI(node.children[i])) return true;
-        }
-        return false;
-    }
-    removeUI(activeScreen.uiTree);
-    
-    activeScreen.floatingBlocks = activeScreen.floatingBlocks.filter(fb => !(fb.node.type === 'UIEvent' && fb.node.props.sourceId === id));
-    
-    updateAllViews();
 }
 
 function createVisualBlock(node, localVars = []) {
@@ -1695,7 +1698,6 @@ function createVisualBlock(node, localVars = []) {
         }
         block.appendChild(childrenContainer);
 
-        // Sub-Branches für If Block rendern
         if (node.type === 'If') {
             if (node.elseIfs) {
                 node.elseIfs.forEach((elif, elifIdx) => {
@@ -2251,7 +2253,7 @@ function renderEmulator(preserveState = false) {
 window.updateAllViews = function() {
     renderBlockEditor();      
     renderEmulator(true);         
-    syncKotlinCodeToVFS();
+    if (typeof syncKotlinCodeToVFS === 'function') syncKotlinCodeToVFS();
     if (window.refreshStaticAnalysis) window.refreshStaticAnalysis();
 };
 
@@ -2600,7 +2602,7 @@ fun mathListOp(listStr: String, op: String): Float {
 `;
 }
 
-function syncKotlinCodeToVFS() {
+window.syncKotlinCodeToVFS = function() {
     if(!vfs) return;
     const mainActivityPath = Object.keys(vfs).find(k => k.endsWith('MainActivity.kt'));
     if (mainActivityPath) {
@@ -2609,11 +2611,7 @@ function syncKotlinCodeToVFS() {
             document.getElementById('codeEditor').value = vfs[mainActivityPath];
         }
     }
-}
-
-function printCodeToConsole() {
-    logToConsole("[Build-Worker simuliert] APK wird generiert...\n" + generateKotlinCode());
-}
+};
 
 // ==========================================
 // PANNING & ZOOMING SCRIPT (CANVAS)

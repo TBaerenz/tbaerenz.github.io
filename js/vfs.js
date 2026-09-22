@@ -15,20 +15,20 @@ document.getElementById('fileTree').addEventListener('contextmenu', (e) => {
     }
 });
 
-function startCreate(type, extension) {
+window.startCreate = function(type, extension) {
     let targetUl = document.getElementById('fileTree').querySelector('ul');
     if(targetUl) performCreate(type, extension, targetUl);
-}
+};
 
 async function performCreate(type, extension, targetUl) {
-    hideAllMenus();
+    window.hideAllMenus();
     let msg = type === 'folder' ? dictionary['prompt_new_folder'][currentLang] : dictionary['prompt_new'][currentLang] + ` (Endung: ${extension})`;
-    let name = await openModal({ title: dictionary['ctx_new'][currentLang], message: msg, type: 'prompt', validate: validateName });
+    let name = await window.openModal({ title: dictionary['ctx_new'][currentLang], message: msg, type: 'prompt', validate: window.validateName });
     
     if (name !== null) {
         let finalName = type === 'folder' ? name : name + extension;
         let parentDetails = targetUl.parentElement; 
-        let parentPath = parentDetails.classList.contains('folder') ? getFullPath(parentDetails) : '';
+        let parentPath = parentDetails.classList.contains('folder') ? window.getFullPath(parentDetails) : '';
         let newFullPath = parentPath ? parentPath + '/' + finalName : finalName;
 
         if (type === 'folder') {
@@ -40,15 +40,15 @@ async function performCreate(type, extension, targetUl) {
             vfs[newFullPath] = ""; 
             const li = document.createElement('li');
             li.className = 'file-item';
-            li.onclick = function() { openFileByNode(this); };
+            li.onclick = function() { window.openFileByNode(this); };
             li.innerHTML = `${SVG_FILE} <span class="item-name">${finalName}</span>`;
             targetUl.appendChild(li);
         }
     }
 }
 
-async function handleCtxAction(action) {
-    hideAllMenus();
+window.handleCtxAction = async function(action) {
+    window.hideAllMenus();
     if (!currentContextTarget) return;
     let isFolder = currentContextTarget.tagName.toLowerCase() === 'summary';
     let nameSpan = currentContextTarget.querySelector('.item-name');
@@ -56,7 +56,7 @@ async function handleCtxAction(action) {
     let nodeContainer = isFolder ? currentContextTarget.parentElement : currentContextTarget;
     let targetUl = isFolder ? currentContextTarget.nextElementSibling : currentContextTarget.parentElement;
     
-    let oldPath = getFullPath(nodeContainer);
+    let oldPath = window.getFullPath(nodeContainer);
 
     if (action.startsWith('new_')) {
         let type = action === 'new_folder' ? 'folder' : 'file';
@@ -70,12 +70,12 @@ async function handleCtxAction(action) {
             if(lastDot > 0) { baseName = fullName.substring(0, lastDot); extension = fullName.substring(lastDot); }
         }
         
-        let newBaseName = await openModal({ title: dictionary['ctx_rename'][currentLang], message: dictionary['prompt_rename'][currentLang], type: 'prompt', defaultValue: baseName, validate: validateName });
+        let newBaseName = await window.openModal({ title: dictionary['ctx_rename'][currentLang], message: dictionary['prompt_rename'][currentLang], type: 'prompt', defaultValue: baseName, validate: window.validateName });
 
         if (newBaseName !== null && newBaseName !== baseName) {
             let finalNewName = newBaseName + extension;
             nameSpan.textContent = finalNewName; 
-            let newPath = getFullPath(nodeContainer); 
+            let newPath = window.getFullPath(nodeContainer); 
             
             if (isFolder) {
                 Object.keys(vfs).forEach(k => {
@@ -92,7 +92,7 @@ async function handleCtxAction(action) {
         }
     } 
     else if (action === 'delete') {
-        let confirmed = await openModal({ title: dictionary['ctx_delete'][currentLang], message: dictionary['prompt_delete'][currentLang] + "'" + fullName + "'?", type: 'confirm', danger: true });
+        let confirmed = await window.openModal({ title: dictionary['ctx_delete'][currentLang], message: dictionary['prompt_delete'][currentLang] + "'" + fullName + "'?", type: 'confirm', danger: true });
         if (confirmed) {
             nodeContainer.remove();
             if (isFolder) {
@@ -113,7 +113,7 @@ async function handleCtxAction(action) {
         if (clipboard.action === 'cut') {
             targetUl.appendChild(clipboard.node);
             clipboard.node.classList.remove('cut-item');
-            let pastedPath = getFullPath(clipboard.node);
+            let pastedPath = window.getFullPath(clipboard.node);
             
             if (clipboard.isFolder) {
                 Object.keys(vfs).forEach(k => {
@@ -136,12 +136,12 @@ async function handleCtxAction(action) {
             else {
                 let dotIdx = oldName.lastIndexOf('.');
                 newName = dotIdx > 0 ? oldName.substring(0, dotIdx) + "_kopie" + oldName.substring(dotIdx) : oldName + "_kopie";
-                clone.onclick = function() { openFileByNode(this); };
+                clone.onclick = function() { window.openFileByNode(this); };
             }
             cloneNameSpan.textContent = newName;
             targetUl.appendChild(clone);
             
-            let pastedPath = getFullPath(clone);
+            let pastedPath = window.getFullPath(clone);
             if (clipboard.isFolder) {
                 Object.keys(vfs).forEach(k => {
                     if (k.startsWith(clipboard.originPath + '/')) {
@@ -155,7 +155,7 @@ async function handleCtxAction(action) {
         }
     }
     currentContextTarget = null;
-}
+};
 
 // ==========================================
 // TABS & EDITOR MODI
@@ -164,39 +164,39 @@ const tabsContainer = document.getElementById('editorTabs');
 const editorElement = document.getElementById('codeEditor');
 const mainCanvas = document.getElementById('mainCanvas');
 
-function setEditorMode(mode) {
+window.setEditorMode = function(mode) {
     currentEditorMode = mode;
-    hideAllMenus();
+    window.hideAllMenus();
     const sidebarLeft = document.getElementById('sidebarLeft');
     
     if (mode === 'block') {
         mainCanvas.classList.add('mode-block'); mainCanvas.classList.remove('mode-code');
-        sidebarLeft.classList.remove('collapsed'); // Automatisches Ausklappen
-        switchLeftTab('blocks'); // Wechsel zur Ansicht "Blöcke/Befehle"
-        renderBlockEditor(); 
+        sidebarLeft.classList.remove('collapsed'); 
+        window.switchLeftTab('blocks'); 
+        window.renderBlockEditor(); 
     } else {
         mainCanvas.classList.add('mode-code'); mainCanvas.classList.remove('mode-block');
-        sidebarLeft.classList.remove('collapsed'); // Automatisches Ausklappen
-        switchLeftTab('files'); // Wechsel zur Ansicht "Datei-Explorer"
+        sidebarLeft.classList.remove('collapsed'); 
+        window.switchLeftTab('files'); 
         if(activeFile && vfs[activeFile] !== undefined) {
             editorElement.value = vfs[activeFile];
         }
     }
-}
+};
 
-function openFileByNode(liElement) {
-    let fullPath = getFullPath(liElement);
+window.openFileByNode = function(liElement) {
+    let fullPath = window.getFullPath(liElement);
     if (!openFiles.includes(fullPath)) openFiles.push(fullPath);
     activeFile = fullPath;
-    if(currentEditorMode === 'block') setEditorMode('code');
+    if(currentEditorMode === 'block') window.setEditorMode('code');
     renderTabs(); renderEditorContent();
-}
+};
 
-function closeFile(fullPath, event) {
+window.closeFile = function(fullPath, event) {
     event.stopPropagation();
     if (activeFile === fullPath) vfs[fullPath] = editorElement.value; 
     forceCloseTab(fullPath);
-}
+};
 
 function forceCloseTab(fullPath) {
     openFiles = openFiles.filter(f => f !== fullPath);
@@ -211,12 +211,12 @@ function updateTabPaths(oldP, newP) {
     renderTabs();
 }
 
-function switchTab(fullPath) { 
+window.switchTab = function(fullPath) { 
     if (activeFile && vfs[activeFile] !== undefined) vfs[activeFile] = editorElement.value; 
     activeFile = fullPath; 
-    if(currentEditorMode === 'block') setEditorMode('code');
+    if(currentEditorMode === 'block') window.setEditorMode('code');
     renderTabs(); renderEditorContent();
-}
+};
 
 function renderTabs() {
     if (openFiles.length === 0) { tabsContainer.classList.add('hidden'); tabsContainer.innerHTML = ''; return; }
@@ -276,10 +276,10 @@ function renderEditorContent() {
 // ==========================================
 // VFS LADEN (ZIP ODER DEFAULT)
 // ==========================================
-async function loadDefaultProject() {
-    hideAllMenus();
+window.loadDefaultProject = async function() {
+    window.hideAllMenus();
     
-    let confirmed = await openModal({ 
+    let confirmed = await window.openModal({ 
         title: dictionary['menu_file_load_default'][currentLang], 
         message: dictionary['prompt_new_project_warn'][currentLang], 
         type: 'confirm', 
@@ -287,14 +287,13 @@ async function loadDefaultProject() {
     });
     
     if (confirmed) {
-        await fetchAndLoadZip();
+        await window.fetchAndLoadZip();
     }
-}
+};
 
-async function fetchAndLoadZip() {
-    logToConsole("Versuche 'template.zip' vom Server zu laden...");
+window.fetchAndLoadZip = async function() {
+    window.logToConsole("Initializing environment...");
     
-    // WICHTIG: Setze das Block-Modell auf den Standard zurück!
     appModel = getDefaultAppModel();
     
     try {
@@ -312,37 +311,43 @@ async function fetchAndLoadZip() {
             vfs[relativePath] = await zipEntry.async("text");
             paths.push(relativePath);
         }
-        logToConsole(`Erfolgreich geladen: ${paths.length} Dateien aus ZIP.`);
+        window.logToConsole(`Erfolgreich geladen: ${paths.length} Dateien aus ZIP.`);
         renderFileTreeFromPaths(paths);
     } catch (e) {
-        logToConsole(`Keine template.zip gefunden (${e.message}). Lade Standard-Dummy-Projekt.`, true);
+        window.logToConsole(`Standard-Projekt wird geladen.`);
+        
+        let ktCode = "";
+        try { 
+            ktCode = window.generateKotlinCode(); 
+        } catch(err) {
+            ktCode = "// Kotlin Generator Error";
+        }
+        
         vfs = {
             "MyApplication/src/main/AndroidManifest.xml": "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n    <application android:label=\"MyApplication\">\n        <activity android:name=\".MainActivity\">\n        </activity>\n    </application>\n</manifest>",
-            "MyApplication/src/main/java/com/example/myapplication/MainActivity.kt": generateKotlinCode(),
+            "MyApplication/src/main/java/com/example/myapplication/MainActivity.kt": ktCode,
             "MyApplication/build.gradle.kts": "plugins {\n    alias(libs.plugins.android.application)\n    alias(libs.plugins.jetbrains.kotlin.android)\n}\n\nandroid {\n    namespace = \"com.example.myapplication\"\n    compileSdk = 34\n}"
         };
         renderFileTreeFromPaths(Object.keys(vfs));
     }
 
-    // Standard-Aktion nach dem Laden: MainActivity als geöffneten Tab markieren, in den Block-Editor wechseln!
     const mainActivityPath = Object.keys(vfs).find(k => k.endsWith('MainActivity.kt'));
     if (mainActivityPath) {
         openFiles = [mainActivityPath];
         activeFile = mainActivityPath;
         
-        updateAllViews();
+        window.updateAllViews();
         renderTabs();
         
-        // Startet sofort im Block-Mode, was auch das Commands-Panel ausklappt (siehe setEditorMode)
-        setEditorMode('block');
+        window.setEditorMode('block');
     } else {
         openFiles = [];
         activeFile = null;
-        updateAllViews();
+        window.updateAllViews();
         renderTabs();
         renderEditorContent();
     }
-}
+};
 
 function renderFileTreeFromPaths(paths) {
     const root = {};
@@ -380,7 +385,7 @@ function renderFileTreeFromPaths(paths) {
             } else {
                 const li = document.createElement('li');
                 li.className = 'file-item';
-                li.onclick = function() { openFileByNode(this); };
+                li.onclick = function() { window.openFileByNode(this); };
                 li.innerHTML = `${SVG_FILE} <span class="item-name">${key}</span>`;
                 ul.appendChild(li);
             }

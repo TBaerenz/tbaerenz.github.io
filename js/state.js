@@ -13,11 +13,13 @@ let currentEditorMode = 'code';
 let clipboard = null;
 let currentContextTarget = null;
 let currentLang = 'de';
-
 let blockClipboard = null; 
 
-// Initialize Global Emulator State
+// Initialisierung der globalen Stati (Verhindert undefined Fehler)
 window.emulatorScreenArg = "";
+window.canvasState = { x: 0, y: 0, scale: 1 };
+window.draggedExprType = null;
+window.draggedNodeType = null; 
 
 function getDefaultAppModel() {
     return {
@@ -30,10 +32,30 @@ function getDefaultAppModel() {
             uiTree: {
                 type: "Column", id: "root_col", props: {},
                 children: [
-                    { type: "TextLabel", id: "lbl_1", props: { text: "Willkommen in der App!" } }
+                    { type: "TextLabel", id: "lbl_title", props: { text: "Gib deinen Namen ein / Enter your name:" } },
+                    { type: "TextField", id: "input_name", props: { label: "Name" } },
+                    { type: "Button", id: "btn_click", props: { label: "Begrüßen / Greet" } },
+                    { type: "TextLabel", id: "lbl_result", props: { text: "..." } }
                 ]
             },
-            floatingBlocks: []
+            floatingBlocks: [
+                {
+                    x: 50, y: 50,
+                    node: {
+                        type: "UIEvent", id: genId('evt'), props: { sourceId: "btn_click", eventType: "onClick" },
+                        children: [
+                            {
+                                type: "SetUIProperty", id: genId('stmt'), props: { targetId: "lbl_result", property: "text" },
+                                value: {
+                                    type: "MathOp", id: genId('exp'), operator: "+",
+                                    left: { type: "StringValue", id: genId('exp'), value: "Hallo / Hello, " },
+                                    right: { type: "GetUIProperty", id: genId('exp'), props: { targetId: "input_name", property: "text" } }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
         }]
     };
 }
@@ -44,9 +66,6 @@ function getActiveScreen() {
     return appModel.screens.find(s => s.id === appModel.activeScreenId) || appModel.screens[0];
 }
 
-// ==========================================
-// HILFSFUNKTIONEN
-// ==========================================
 function genId(prefix) { return prefix + '_' + Date.now() + Math.floor(Math.random() * 1000); }
 
 function deepCloneNodeWithNewIds(node) {
@@ -67,36 +86,9 @@ function deepCloneNodeWithNewIds(node) {
 function findNodeById(current, id) {
     if (!current) return null;
     if (current.id === id) return current;
-    
-    if (current.children) {
-        for (let child of current.children) {
-            let found = findNodeById(child, id);
-            if (found) return found;
-        }
-    }
-    
-    if (current.elseIfs) {
-        for (let elif of current.elseIfs) {
-            if (elif.id === id) return elif;
-            if (elif.children) {
-                for (let child of elif.children) {
-                    let found = findNodeById(child, id);
-                    if (found) return found;
-                }
-            }
-        }
-    }
-    
-    if (current.elseBranch) {
-        if (current.elseBranch.id === id) return current.elseBranch;
-        if (current.elseBranch.children) {
-            for (let child of current.elseBranch.children) {
-                let found = findNodeById(child, id);
-                if (found) return found;
-            }
-        }
-    }
-    
+    if (current.children) { for (let child of current.children) { let found = findNodeById(child, id); if (found) return found; } }
+    if (current.elseIfs) { for (let elif of current.elseIfs) { if (elif.id === id) return elif; if (elif.children) { for (let child of elif.children) { let found = findNodeById(child, id); if (found) return found; } } } }
+    if (current.elseBranch) { if (current.elseBranch.id === id) return current.elseBranch; if (current.elseBranch.children) { for (let child of current.elseBranch.children) { let found = findNodeById(child, id); if (found) return found; } } }
     return null;
 }
 
@@ -111,50 +103,28 @@ function findNodeAnywhere(id) {
 
 function removeNodeById(current, id) {
     if (!current) return null;
-    
     if (current.children) {
         for (let i = 0; i < current.children.length; i++) {
-            if (current.children[i].id === id) {
-                return current.children.splice(i, 1)[0];
-            } else {
-                let found = removeNodeById(current.children[i], id);
-                if (found) return found;
-            }
+            if (current.children[i].id === id) return current.children.splice(i, 1)[0];
+            else { let found = removeNodeById(current.children[i], id); if (found) return found; }
         }
     }
-    
     if (current.elseIfs) {
         for (let elif of current.elseIfs) {
-            if (elif.children) {
-                for (let i = 0; i < elif.children.length; i++) {
-                    if (elif.children[i].id === id) return elif.children.splice(i, 1)[0];
-                    let found = removeNodeById(elif.children[i], id);
-                    if (found) return found;
-                }
-            }
+            if (elif.children) { for (let i = 0; i < elif.children.length; i++) { if (elif.children[i].id === id) return elif.children.splice(i, 1)[0]; let found = removeNodeById(elif.children[i], id); if (found) return found; } }
         }
     }
-    
     if (current.elseBranch && current.elseBranch.children) {
-        for (let i = 0; i < current.elseBranch.children.length; i++) {
-            if (current.elseBranch.children[i].id === id) return current.elseBranch.children.splice(i, 1)[0];
-            let found = removeNodeById(current.elseBranch.children[i], id);
-            if (found) return found;
-        }
+        for (let i = 0; i < current.elseBranch.children.length; i++) { if (current.elseBranch.children[i].id === id) return current.elseBranch.children.splice(i, 1)[0]; let found = removeNodeById(current.elseBranch.children[i], id); if (found) return found; }
     }
-    
     return null;
 }
 
 function extractNodeFromAnywhere(id) {
     let screen = getActiveScreen();
     for (let i = 0; i < screen.floatingBlocks.length; i++) {
-        if (screen.floatingBlocks[i].node.id === id) {
-            return screen.floatingBlocks.splice(i, 1)[0].node;
-        } else {
-            let inner = removeNodeById(screen.floatingBlocks[i].node, id);
-            if (inner) return inner;
-        }
+        if (screen.floatingBlocks[i].node.id === id) return screen.floatingBlocks.splice(i, 1)[0].node;
+        else { let inner = removeNodeById(screen.floatingBlocks[i].node, id); if (inner) return inner; }
     }
     return null;
 }
@@ -164,46 +134,26 @@ function removeExpressionById(current, id) {
     let props = ['condition', 'value', 'left', 'right', 'min', 'max', 'list', 'start', 'end', 'step', 'textExpr', 'arg']; 
     for (let p of props) {
         if (current[p] && typeof current[p] === 'object') {
-            if (current[p].id === id) {
-                current[p] = null;
-                return true;
-            }
+            if (current[p].id === id) { current[p] = null; return true; }
             if (removeExpressionById(current[p], id)) return true;
         }
     }
-    
-    if (current.children) {
-        for (let child of current.children) {
-            if (removeExpressionById(child, id)) return true;
-        }
-    }
+    if (current.children) { for (let child of current.children) { if (removeExpressionById(child, id)) return true; } }
     if (current.elseIfs) {
         for (let elif of current.elseIfs) {
-            if (elif.condition && typeof elif.condition === 'object') {
-                if (elif.condition.id === id) { elif.condition = null; return true; }
-                if (removeExpressionById(elif.condition, id)) return true;
-            }
-            if (elif.children) {
-                for (let child of elif.children) { if (removeExpressionById(child, id)) return true; }
-            }
+            if (elif.condition && typeof elif.condition === 'object') { if (elif.condition.id === id) { elif.condition = null; return true; } if (removeExpressionById(elif.condition, id)) return true; }
+            if (elif.children) { for (let child of elif.children) { if (removeExpressionById(child, id)) return true; } }
         }
     }
-    if (current.elseBranch && current.elseBranch.children) {
-        for (let child of current.elseBranch.children) { if (removeExpressionById(child, id)) return true; }
-    }
-    
+    if (current.elseBranch && current.elseBranch.children) { for (let child of current.elseBranch.children) { if (removeExpressionById(child, id)) return true; } }
     return false;
 }
 
 function getFullPath(element) {
-    let pathParts = [];
-    let current = element;
+    let pathParts = []; let current = element;
     while(current && current.id !== 'fileTree') {
-        if (current.classList.contains('file-item')) {
-            pathParts.unshift(current.querySelector('.item-name').textContent);
-        } else if (current.tagName.toLowerCase() === 'details' && current.classList.contains('folder')) {
-            pathParts.unshift(current.querySelector('summary .item-name').textContent);
-        }
+        if (current.classList.contains('file-item')) pathParts.unshift(current.querySelector('.item-name').textContent);
+        else if (current.tagName.toLowerCase() === 'details' && current.classList.contains('folder')) pathParts.unshift(current.querySelector('summary .item-name').textContent);
         current = current.parentElement;
     }
     return pathParts.join('/');
@@ -219,9 +169,9 @@ function logToConsole(msg, isError = false) {
     consoleContent.scrollTop = consoleContent.scrollHeight;
 }
 
-function clearConsole(e) {
+window.clearConsole = function(e) {
     if (e) e.stopPropagation();
     const consoleContent = document.getElementById('consoleContent');
     consoleContent.innerHTML = '';
     logToConsole(dictionary['terminal_ready'][currentLang].replace('> ', ''));
-}
+};
