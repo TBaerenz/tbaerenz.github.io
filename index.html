@@ -88,6 +88,11 @@
         .btn-add-var { width: 100%; background: var(--bg-nav); border: 1px dashed var(--border-color); padding: 8px; color: var(--text-main); font-weight: 600; font-size: 13px; cursor: pointer; border-radius: 4px; transition: 0.2s; margin-bottom: 5px; }
         .btn-add-var:hover { border-color: var(--accent-color); color: var(--accent-color); }
 
+        /* Sidebar Listen Elemente (Klickbar/Rechtsklick) */
+        .sidebar-list-item { cursor: pointer; padding: 2px 4px; border-radius: 3px; display: inline-block; transition: background 0.2s; }
+        .sidebar-list-item:hover { background: rgba(0,0,0,0.1); }
+        [data-theme="dark"] .sidebar-list-item:hover { background: rgba(255,255,255,0.1); }
+
         .file-tree { padding: 10px; font-size: 14px; white-space: nowrap; user-select: none; }
         .folder summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 5px 0; }
         .folder summary::-webkit-details-marker { display: none; } 
@@ -143,19 +148,35 @@
 
         .canvas { flex: 1; display: flex; flex-direction: column; background-image: radial-gradient(var(--border-color) 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; position: relative;}
         .code-editor { width: 100%; height: 100%; resize: none; border: none; outline: none; background-color: var(--editor-bg); color: var(--editor-text); font-family: 'Courier New', Courier, monospace; font-size: 14px; padding: 20px; line-height: 1.5; white-space: pre; overflow: auto; display: none; }
-        .block-editor { width: 100%; height: 100%; overflow: auto; padding: 20px; display: none; background-color: var(--bg-canvas); }
+        .block-editor { width: 100%; height: 100%; overflow: auto; padding: 20px; display: none; background-color: var(--bg-canvas); position: relative; }
         .canvas.mode-code.has-file { background-image: none; background-color: var(--editor-bg); }
         .canvas.mode-code.has-file .code-editor { display: block; }
-        .canvas.mode-block .block-editor { display: flex; flex-direction: column; gap: 0px; align-items: flex-start; }
+        .canvas.mode-block .block-editor { display: block; }
 
         /* =========================================
            Visual Blocks, Drop Zones & Expressions
            ========================================= */
-        .visual-block { background: var(--block-bg-color); border: 1px solid var(--block-border); border-radius: 8px; padding: 12px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 250px; width: fit-content; transition: border-color 0.2s, background-color 0.2s; }
+        .visual-block { background: var(--block-bg-color); border: 1px solid var(--block-border); border-radius: 8px; padding: 12px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 250px; width: fit-content; transition: border-color 0.2s, background-color 0.2s, opacity 0.2s; }
         .visual-block-header { font-weight: 600; font-size: 14px; margin-bottom: 10px; color: var(--accent-color); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
         .visual-block-children { padding-left: 20px; border-left: 2px dashed var(--border-color); margin-top: 10px; display: flex; flex-direction: column; gap: 0px; min-height: 20px; }
         
         .visual-block-prop { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-top: 8px; color: var(--text-main); }
+        
+        /* Disconnected (Free-Floating) Modifier */
+        .visual-block.disconnected { filter: saturate(0.5) opacity(0.85); border: 2px dashed var(--border-color); box-shadow: none; }
+
+        /* Highlight Missing Reference (Red) */
+        .invalid-ref { border: 2px solid #ef4444 !important; background-color: rgba(239, 68, 68, 0.1) !important; }
+        .invalid-ref > .visual-block-header { color: #ef4444 !important; }
+        .invalid-ref.expr-block { color: #ef4444 !important; }
+        .invalid-ref .block-control { border-color: #ef4444 !important; color: #ef4444 !important; }
+
+        /* Animation für Highlighted Block (bei Klick auf Fkt-Name) */
+        @keyframes blink {
+            0%, 100% { border-color: var(--border-color); box-shadow: none; }
+            50% { border-color: var(--accent-color); box-shadow: 0 0 10px var(--accent-color); transform: scale(1.02); }
+        }
+        .blink-highlight { animation: blink 0.5s ease-in-out 3; }
 
         /* EINHEITLICHES DESIGN für alle Dropdowns und Textfelder */
         .block-control {
@@ -218,7 +239,7 @@
             display: inline-flex; align-items: center; height: 32px; 
             padding: 0 10px; font-size: 13px; 
             background-color: var(--expr-bg); color: var(--expr-text); font-weight: 500; 
-            cursor: grab; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: max-content; white-space: nowrap;
+            cursor: grab; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: max-content; white-space: nowrap; transition: opacity 0.2s;
         }
 
         /* Deaktiviere falsche Ziele während des Draggings */
@@ -257,6 +278,7 @@
         </div>
     </div>
 
+    <!-- Kontextmenü für Dateien -->
     <div class="context-menu" id="fileMenuDropdown">
         <ul><li onclick="loadDefaultProject()"><span data-i18n="menu_file_load_default">Neues Projekt (Standard)</span></li></ul>
     </div>
@@ -290,6 +312,26 @@
             <div class="menu-divider"></div>
             <li onclick="handleCtxAction('rename')"><span data-i18n="ctx_rename">Umbenennen</span></li>
             <li onclick="handleCtxAction('delete')" style="color: #ef4444;"><span data-i18n="ctx_delete">Löschen</span></li>
+        </ul>
+    </div>
+
+    <!-- Kontextmenü für Visual Blocks -->
+    <div class="context-menu" id="blockContextMenu">
+        <ul>
+            <li id="ctx-edit-params" onclick="handleBlockCtxAction('edit_params')"><span data-i18n="ctx_edit_params">Parameter bearbeiten...</span></li>
+            <div class="menu-divider" id="ctx-div-1"></div>
+            <li id="ctx-copy-block" onclick="handleBlockCtxAction('copy')"><span data-i18n="ctx_copy_block">Block kopieren</span></li>
+            <li id="ctx-cut-block" onclick="handleBlockCtxAction('cut')"><span data-i18n="ctx_cut_block">Block ausschneiden</span></li>
+            <li id="ctx-paste-block" onclick="handleBlockCtxAction('paste')"><span data-i18n="ctx_paste_block">Einfügen</span></li>
+            <div class="menu-divider" id="ctx-div-2"></div>
+            <li id="ctx-delete-block" onclick="handleBlockCtxAction('delete')" style="color: #ef4444;"><span data-i18n="ctx_delete_block">Löschen</span></li>
+        </ul>
+    </div>
+
+    <!-- Kontextmenü für Sidebar Listen (Var/Func) -->
+    <div class="context-menu" id="sidebarListMenu">
+        <ul>
+            <li onclick="handleListCtxAction('delete')" style="color: #ef4444;"><span data-i18n="ctx_delete">Löschen</span></li>
         </ul>
     </div>
 
@@ -346,6 +388,16 @@
                             <div id="sidebarVarList" style="margin: 0 5px 8px 5px; font-size: 12px; color: var(--text-muted);"></div>
                             <div class="command-block" draggable="true" data-type="SetVariable" ondragstart="handleDragStartSidebar(event)" data-i18n="block_set_var">Setze Variable</div>
                             <div class="command-block val-expr" draggable="true" data-type="VarValue" data-is-expr="true" data-expr-type="value" ondragstart="handleDragStartSidebar(event)" data-i18n="block_get_var">Variable (Wert)</div>
+                        </div>
+                    </details>
+                    
+                    <details class="category" open><summary data-i18n="cat_functions">Funktionen</summary>
+                        <div class="commands-list">
+                            <button class="btn-add-var" onclick="createNewFunction()" data-i18n="btn_new_func">+ Neue Funktion</button>
+                            <div id="sidebarFuncList" style="margin: 0 5px 8px 5px; font-size: 12px; color: var(--text-muted);"></div>
+                            <div class="command-block" draggable="true" data-type="CallFunction" ondragstart="handleDragStartSidebar(event)" data-i18n="block_call_func">Funktionsaufruf</div>
+                            <div class="command-block val-expr" draggable="true" data-type="CallFunctionExpr" data-is-expr="true" data-expr-type="value" ondragstart="handleDragStartSidebar(event)" data-i18n="block_call_func_expr">Funktion (Wert)</div>
+                            <div class="command-block" draggable="true" data-type="Return" ondragstart="handleDragStartSidebar(event)" data-i18n="block_return">Return (Rückgabe)</div>
                         </div>
                     </details>
 

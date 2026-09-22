@@ -167,11 +167,17 @@ const mainCanvas = document.getElementById('mainCanvas');
 function setEditorMode(mode) {
     currentEditorMode = mode;
     hideAllMenus();
+    const sidebarLeft = document.getElementById('sidebarLeft');
+    
     if (mode === 'block') {
         mainCanvas.classList.add('mode-block'); mainCanvas.classList.remove('mode-code');
+        sidebarLeft.classList.remove('collapsed'); // Automatisches Ausklappen
+        switchLeftTab('blocks'); // Wechsel zur Ansicht "Blöcke/Befehle"
         renderBlockEditor(); 
     } else {
         mainCanvas.classList.add('mode-code'); mainCanvas.classList.remove('mode-block');
+        sidebarLeft.classList.remove('collapsed'); // Automatisches Ausklappen
+        switchLeftTab('files'); // Wechsel zur Ansicht "Datei-Explorer"
         if(activeFile && vfs[activeFile] !== undefined) {
             editorElement.value = vfs[activeFile];
         }
@@ -318,20 +324,17 @@ async function fetchAndLoadZip() {
         renderFileTreeFromPaths(Object.keys(vfs));
     }
 
-    if (!document.getElementById('btn-files').classList.contains('active')) {
-        toggleLeftPanel('files');
-    }
-
-    // Standard-Aktion nach dem Laden: MainActivity im Block-Editor öffnen
+    // Standard-Aktion nach dem Laden: MainActivity als geöffneten Tab markieren, in den Block-Editor wechseln!
     const mainActivityPath = Object.keys(vfs).find(k => k.endsWith('MainActivity.kt'));
     if (mainActivityPath) {
         openFiles = [mainActivityPath];
         activeFile = mainActivityPath;
         
-        // Alle Views (inklusive Code und Emulator) frisch synchronisieren
         updateAllViews();
+        renderTabs();
         
-        setEditorMode('block'); // Aktiviert den Block-Modus & zeichnet den Block Editor
+        // Startet sofort im Block-Mode, was auch das Commands-Panel ausklappt (siehe setEditorMode)
+        setEditorMode('block');
     } else {
         openFiles = [];
         activeFile = null;

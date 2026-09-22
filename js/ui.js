@@ -15,6 +15,7 @@ const dictionary = {
     'cat_control': { de: 'Container & Layout', en: 'Container & Layout' },
     'cat_logic': { de: 'Logik & Schleifen', en: 'Logic & Loops' },
     'cat_vars': { de: 'Variablen', en: 'Variables' },
+    'cat_functions': { de: 'Funktionen', en: 'Functions' },
     
     'block_scaffold': { de: 'Scaffold Container', en: 'Scaffold Container' },
     'block_greeting': { de: 'Text (Greeting)', en: 'Text (Greeting)' },
@@ -27,6 +28,9 @@ const dictionary = {
     'block_or': { de: 'Oder (OR)', en: 'Or (OR)' },
     'block_set_var': { de: 'Setze Variable', en: 'Set Variable' },
     'block_get_var': { de: 'Variable (Wert)', en: 'Variable (Value)' },
+    'block_call_func': { de: 'Funktionsaufruf', en: 'Call Function' },
+    'block_call_func_expr': { de: 'Funktion (Wert)', en: 'Function (Value)' },
+    'block_return': { de: 'Return (Rückgabe)', en: 'Return (Value)' },
     
     'btn_new_var': { de: '+ Neue Variable', en: '+ New Variable' },
     'prompt_new_var': { de: 'Name der neuen Variable (z.B. punkte):', en: 'Name of new variable (e.g. score):' },
@@ -34,6 +38,19 @@ const dictionary = {
     'sidebar_no_vars': { de: 'Keine Variablen definiert', en: 'No variables defined' },
     'sidebar_vars_list': { de: 'Variablen:', en: 'Variables:' },
     'drop_expr': { de: '...ablegen', en: '...drop' },
+
+    'btn_new_func': { de: '+ Neue Funktion', en: '+ New Function' },
+    'prompt_new_func': { de: 'Name der neuen Funktion:', en: 'Name of new function:' },
+    'prompt_func_params': { de: 'Parameter-Namen (kommagetrennt, z.B. x, y):', en: 'Parameter names (comma separated, e.g. x, y):' },
+    'prompt_func_success': { de: 'Funktion erstellt: ', en: 'Function created: ' },
+    'sidebar_no_funcs': { de: 'Keine Funktionen', en: 'No functions' },
+    'sidebar_funcs_list': { de: 'Funktionen:', en: 'Functions:' },
+
+    'ctx_edit_params': { de: 'Parameter bearbeiten...', en: 'Edit Parameters...' },
+    'ctx_copy_block': { de: 'Block kopieren', en: 'Copy Block' },
+    'ctx_cut_block': { de: 'Block ausschneiden', en: 'Cut Block' },
+    'ctx_paste_block': { de: 'Einfügen', en: 'Paste' },
+    'ctx_delete_block': { de: 'Löschen', en: 'Delete' },
 
     'tree_empty': { de: 'Kein Projekt geladen. Wähle "Datei -> Neues Projekt".', en: 'No project loaded. Choose "File -> New Project".' },
     'terminal_title': { de: 'Terminal / Logs', en: 'Terminal / Logs' },
@@ -50,7 +67,7 @@ const dictionary = {
     'btn_cancel': { de: 'Abbrechen', en: 'Cancel' }, 'btn_ok': { de: 'OK', en: 'OK' },
     'err_empty_name': { de: 'Der Name darf nicht leer sein.', en: 'Name cannot be empty.' },
     'err_invalid_name': { de: 'Punkte (.) und Sonderzeichen sind nicht erlaubt.', en: 'Dots (.) and special characters are not allowed.' },
-    'err_var_exists': { de: 'Diese Variable existiert bereits.', en: 'This variable already exists.' },
+    'err_name_exists': { de: 'Dieser Name (Variable/Funktion) existiert bereits.', en: 'This name (variable/function) already exists.' },
     'color_sunset': { de: 'Sunset Orange', en: 'Sunset Orange' },
     'color_ocean': { de: 'Ocean Blue', en: 'Ocean Blue' },
     'color_emerald': { de: 'Emerald Green', en: 'Emerald Green' },
@@ -129,8 +146,17 @@ const contextMenu = document.getElementById('contextMenu');
 const createMenu = document.getElementById('createMenu');
 const viewMenu = document.getElementById('viewMenu');
 const fileMenuDropdown = document.getElementById('fileMenuDropdown');
+const blockContextMenu = document.getElementById('blockContextMenu');
+const sidebarListMenu = document.getElementById('sidebarListMenu');
 
-function hideAllMenus() { contextMenu.classList.remove('active'); createMenu.classList.remove('active'); viewMenu.classList.remove('active'); fileMenuDropdown.classList.remove('active'); }
+function hideAllMenus() { 
+    contextMenu.classList.remove('active'); 
+    createMenu.classList.remove('active'); 
+    viewMenu.classList.remove('active'); 
+    fileMenuDropdown.classList.remove('active'); 
+    if (blockContextMenu) blockContextMenu.classList.remove('active');
+    if (sidebarListMenu) sidebarListMenu.classList.remove('active');
+}
 function showFileMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); fileMenuDropdown.style.left = rect.left + 'px'; fileMenuDropdown.style.top = (rect.bottom + 10) + 'px'; fileMenuDropdown.classList.add('active'); }
 function showViewMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); viewMenu.style.left = rect.left + 'px'; viewMenu.style.top = (rect.bottom + 10) + 'px'; viewMenu.classList.add('active'); }
 function showCreateMenu(e) { e.stopPropagation(); hideAllMenus(); const rect = e.target.getBoundingClientRect(); createMenu.style.left = rect.left + 'px'; createMenu.style.top = (rect.bottom + 5) + 'px'; createMenu.classList.add('active'); }

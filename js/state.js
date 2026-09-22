@@ -14,10 +14,14 @@ let clipboard = null;
 let currentContextTarget = null;
 let currentLang = 'de';
 
+let blockClipboard = null; // Zwischenablage für das visuelle Block-System
+
 function getDefaultAppModel() {
     return {
         metadata: { appName: "MyApplication", packageName: "com.example.myapplication" },
         variables: [], 
+        functions: [],
+        floatingBlocks: [], // Lose platzierte Blöcke {x: 0, y: 0, node: {...}}
         screens: [{
             id: "MainActivity",
             layout: {
@@ -35,7 +39,26 @@ let appModel = getDefaultAppModel();
 // ==========================================
 // HILFSFUNKTIONEN
 // ==========================================
+function genId(prefix) { return prefix + '_' + Date.now() + Math.floor(Math.random() * 1000); }
+
+// Tiefe Kopie eines Blocks, wobei für jedes Element neue IDs generiert werden
+function deepCloneNodeWithNewIds(node) {
+    if (!node || typeof node !== 'object') return node;
+    let clone = Array.isArray(node) ? [] : {};
+    for (let key in node) {
+        if (key === 'id') {
+            clone[key] = genId(node.type ? node.type.toLowerCase() : 'node');
+        } else if (typeof node[key] === 'object') {
+            clone[key] = deepCloneNodeWithNewIds(node[key]);
+        } else {
+            clone[key] = node[key];
+        }
+    }
+    return clone;
+}
+
 function findNodeById(current, id) {
+    if (!current) return null;
     if (current.id === id) return current;
     if (current.children) {
         for (let child of current.children) {
@@ -46,14 +69,40 @@ function findNodeById(current, id) {
     return null;
 }
 
+function findNodeAnywhere(id) {
+    let found = findNodeById(appModel.screens[0].layout, id);
+    if (found) return found;
+    for (let fb of appModel.floatingBlocks) {
+        if (fb.node.id === id) return fb.node;
+        let inner = findNodeById(fb.node, id);
+        if (inner) return inner;
+    }
+    return null;
+}
+
 function removeNodeById(current, id) {
-    if (!current.children) return null;
+    if (!current || !current.children) return null;
     for (let i = 0; i < current.children.length; i++) {
         if (current.children[i].id === id) {
             return current.children.splice(i, 1)[0];
         } else {
             let found = removeNodeById(current.children[i], id);
             if (found) return found;
+        }
+    }
+    return null;
+}
+
+function extractNodeFromAnywhere(id) {
+    let found = removeNodeById(appModel.screens[0].layout, id);
+    if (found) return found;
+
+    for (let i = 0; i < appModel.floatingBlocks.length; i++) {
+        if (appModel.floatingBlocks[i].node.id === id) {
+            return appModel.floatingBlocks.splice(i, 1)[0].node;
+        } else {
+            let inner = removeNodeById(appModel.floatingBlocks[i].node, id);
+            if (inner) return inner;
         }
     }
     return null;
