@@ -8,14 +8,6 @@ function getExprType(type) {
     return null;
 }
 
-// Holt alle globalen Variablen + Funktionsparameter für Dropdowns
-function getAllVariables() {
-    return Array.from(new Set([
-        ...appModel.variables, 
-        ...appModel.functions.flatMap(f => f.params)
-    ]));
-}
-
 // Prüft ob ein Name schon als Variable oder Funktion genutzt wird
 function checkNameExists(name) {
     let allNames = [...appModel.variables, ...appModel.functions.map(f => f.name)];
@@ -60,6 +52,18 @@ document.addEventListener('dragend', clearDragState);
 // ==========================================
 // DRAG AND DROP (Logik)
 // ==========================================
+function getLocalVarsForNode(id) {
+    for (let fb of appModel.floatingBlocks) {
+        if (fb.node.type === 'FunctionDef') {
+            if (fb.node.id === id || findNodeById(fb.node, id)) {
+                let fModel = appModel.functions.find(f => f.name === fb.node.props.funcName);
+                return fModel ? fModel.params : [];
+            }
+        }
+    }
+    return [];
+}
+
 function handleDragStartSidebar(e) {
     const type = e.target.getAttribute('data-type');
     const isExpr = e.target.getAttribute('data-is-expr') === 'true';
@@ -67,7 +71,7 @@ function handleDragStartSidebar(e) {
     setDragState(isExpr, getExprType(type));
 }
 
-function handleStatementDrop(e, parentId, index) {
+async function handleStatementDrop(e, parentId, index) {
     e.preventDefault(); e.stopPropagation();
     e.currentTarget.classList.remove('drag-over');
     
@@ -85,10 +89,19 @@ function handleStatementDrop(e, parentId, index) {
                 children: (['Scaffold', 'If', 'Loop', 'FunctionDef'].includes(data.type)) ? [] : undefined
             };
             if (data.type === 'Greeting') newNode.props = { name: "Neu" };
-            if (data.type === 'SetVariable') { newNode.props = { varName: getAllVariables()[0] || '' }; newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' }; }
             if (data.type === 'If' || data.type === 'Loop') newNode.condition = { type: 'BooleanValue', id: genId('exp'), value: 'true' };
             if (data.type === 'Return') newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' };
             
+            if (data.type === 'SetVariable') { 
+                let locals = getLocalVarsForNode(parentId);
+                let selectedVar = appModel.variables[0] || locals[0] || '';
+                if (!selectedVar) {
+                    selectedVar = await promptNewVariable();
+                    if (!selectedVar) { clearDragState(); return; } // Abbruch durch Nutzer
+                }
+                newNode.props = { varName: selectedVar };
+                newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' };
+            }
             if (data.type === 'CallFunction') { 
                 let f = appModel.functions[0];
                 newNode.props = { funcName: f ? f.name : '' }; 
@@ -108,10 +121,10 @@ function handleStatementDrop(e, parentId, index) {
         updateAllViews(); 
     } catch(err) { console.error("Drop Fehler Statement:", err); }
     
-    clearDragState(); // Sicheres Aufräumen der CSS-Klassen
+    clearDragState();
 }
 
-function handleExpressionDrop(e, parentNode, propName, expectedType) {
+async function handleExpressionDrop(e, parentNode, propName, expectedType) {
     e.preventDefault(); e.stopPropagation();
     e.currentTarget.classList.remove('drag-over');
     
@@ -120,13 +133,12 @@ function handleExpressionDrop(e, parentNode, propName, expectedType) {
     if (!data.isExpr && data.source !== 'editor-expr') { clearDragState(); return; }
     
     let incomingType = getExprType(data.type || (data.node && data.node.type));
-    if (incomingType !== expectedType) { clearDragState(); return; } // Strenge Typ-Prüfung
+    if (incomingType !== expectedType) { clearDragState(); return; }
     
     let exprNode;
     if (data.source === 'sidebar') {
         if (data.type === 'BooleanValue') exprNode = { type: 'BooleanValue', id: genId('exp'), value: 'true' };
         else if (data.type === 'NumberValue') exprNode = { type: 'NumberValue', id: genId('exp'), value: '0' };
-        else if (data.type === 'VarValue') exprNode = { type: 'VarValue', id: genId('exp'), props: { varName: getAllVariables()[0] || '' } };
         else if (data.type === 'Comparison') exprNode = { 
             type: 'Comparison', id: genId('exp'), operator: '>', 
             left: { type: 'NumberValue', id: genId('exp'), value: '0' }, 
@@ -144,22 +156,31 @@ function handleExpressionDrop(e, parentNode, propName, expectedType) {
             exprNode = { type: 'CallFunctionExpr', id: genId('exp'), props: { funcName: f ? f.name : '' }, args: {} };
             if (f && f.params) f.params.forEach(p => exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
         }
+        else if (data.type === 'VarValue') {
+            let locals = getLocalVarsForNode(parentNode.id);
+            let selectedVar = appModel.variables[0] || locals[0] || '';
+            if (!selectedVar) {
+                selectedVar = await promptNewVariable();
+                if (!selectedVar) { clearDragState(); return; }
+            }
+            exprNode = { type: 'VarValue', id: genId('exp'), props: { varName: selectedVar } };
+        }
     } else if (data.source === 'editor-expr') {
         exprNode = data.node;
-        removeExpressionById(appModel.screens[0].layout, exprNode.id); // Aus alter Position löschen
+        removeExpressionById(appModel.screens[0].layout, exprNode.id);
     }
     
     if (exprNode) {
         parentNode[propName] = exprNode;
         updateAllViews();
     }
-    clearDragState(); // Sicheres Aufräumen der CSS-Klassen
+    clearDragState();
 }
 
 // ==========================================
 // VARIABLEN & FUNKTIONEN ERSTELLEN / LÖSCHEN
 // ==========================================
-async function createNewVariable() {
+async function promptNewVariable() {
     let varName = await openModal({ 
         title: dictionary['btn_new_var'][currentLang], 
         message: dictionary['prompt_new_var'][currentLang], 
@@ -172,10 +193,15 @@ async function createNewVariable() {
     });
     if (varName) {
         appModel.variables.push(varName);
-        let msg = (dictionary['prompt_var_success'][currentLang] || 'Variable erstellt: ') + varName;
-        logToConsole(msg);
+        logToConsole((dictionary['prompt_var_success'][currentLang] || 'Variable erstellt: ') + varName);
         updateAllViews();
+        return varName;
     }
+    return null;
+}
+
+async function createNewVariable() {
+    await promptNewVariable();
 }
 
 async function createNewFunction() {
@@ -344,35 +370,79 @@ function handleListCtxAction(action) {
     currentListTarget = null;
 }
 
-function createVariableDropdown(selectedValue, onChangeCallback) {
+function createVariableDropdown(selectedValue, onChangeCallback, localVars = []) {
     const sel = makeControl('select');
-    let allVars = getAllVariables();
     
-    if (allVars.length === 0) {
-        sel.innerHTML = `<option value="" disabled selected>Keine</option>`;
-        sel.disabled = true;
-    } else {
-        sel.innerHTML = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>Wähle...</option>`;
-        allVars.forEach(v => {
-            sel.innerHTML += `<option value="${v}" ${v === selectedValue ? 'selected' : ''}>${v}</option>`;
-        });
+    sel.innerHTML = `<option value="__NEW__" style="font-weight:bold; color:var(--accent-color);">+ Neu...</option>`;
+    
+    let isMissing = selectedValue && !appModel.variables.includes(selectedValue) && !localVars.includes(selectedValue);
+    
+    if (isMissing) {
+        sel.innerHTML += `<option value="${selectedValue}" class="invalid-ref" selected>${selectedValue} (Fehlt)</option>`;
+    } else if (!selectedValue) {
+        sel.innerHTML += `<option value="" disabled selected>Wähle...</option>`;
     }
-    sel.onchange = onChangeCallback;
+
+    if (appModel.variables.length > 0) {
+        let optgroup = document.createElement('optgroup');
+        optgroup.label = "Globale Variablen";
+        appModel.variables.forEach(v => {
+            let opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            if (v === selectedValue) opt.selected = true;
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    }
+
+    if (localVars.length > 0) {
+        let optgroup = document.createElement('optgroup');
+        optgroup.label = "Lokale Variablen";
+        localVars.forEach(v => {
+            let opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            if (v === selectedValue) opt.selected = true;
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    }
+    
+    sel.onchange = async (e) => {
+        if (e.target.value === '__NEW__') {
+            e.target.value = selectedValue || ''; // Direkt zurücksetzen falls Dialog abgebrochen wird
+            let newVar = await promptNewVariable();
+            if (newVar) {
+                onChangeCallback(newVar);
+            }
+        } else {
+            onChangeCallback(e.target.value);
+        }
+    };
     return sel;
 }
 
 function createFunctionDropdown(selectedValue, onChangeCallback) {
     const sel = makeControl('select');
-    if (appModel.functions.length === 0) {
-        sel.innerHTML = `<option value="" disabled selected>Keine</option>`;
-        sel.disabled = true;
-    } else {
-        sel.innerHTML = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>Wähle...</option>`;
+    let isMissing = selectedValue && !appModel.functions.some(f => f.name === selectedValue);
+    
+    if (isMissing) {
+        sel.innerHTML += `<option value="${selectedValue}" class="invalid-ref" selected>${selectedValue} (Fehlt)</option>`;
+    } else if (!selectedValue) {
+        sel.innerHTML += `<option value="" disabled selected>Wähle...</option>`;
+    }
+
+    if (appModel.functions.length > 0) {
         appModel.functions.forEach(f => {
             sel.innerHTML += `<option value="${f.name}" ${f.name === selectedValue ? 'selected' : ''}>${f.name}</option>`;
         });
+    } else if (!isMissing) {
+        sel.disabled = true;
+        sel.innerHTML = `<option value="" disabled selected>Keine Funktionen</option>`;
     }
-    sel.onchange = onChangeCallback;
+    
+    sel.onchange = (e) => onChangeCallback(e.target.value);
     return sel;
 }
 
@@ -397,14 +467,14 @@ function createDropZone(parentId, index) {
     return dz;
 }
 
-function createExpressionSlot(parentNode, propName, slotType) {
+function createExpressionSlot(parentNode, propName, slotType, localVars = []) {
     const condSlot = document.createElement('div');
     condSlot.className = slotType === 'boolean' ? 'pill-slot' : 'val-slot';
     let currentValue = parentNode[propName];
     
     if (currentValue) {
         condSlot.classList.add('has-value'); 
-        condSlot.appendChild(createExpressionBlock(currentValue, parentNode, propName));
+        condSlot.appendChild(createExpressionBlock(currentValue, parentNode, propName, localVars));
     } else {
         condSlot.innerHTML = dictionary['drop_expr'][currentLang] || '...ablegen';
     }
@@ -427,7 +497,7 @@ function createExpressionSlot(parentNode, propName, slotType) {
     return condSlot;
 }
 
-function createExpressionBlock(exprNode, parentNode, propertyName) {
+function createExpressionBlock(exprNode, parentNode, propertyName, localVars = []) {
     const el = document.createElement('div');
     el.className = 'expr-block';
     
@@ -448,7 +518,7 @@ function createExpressionBlock(exprNode, parentNode, propertyName) {
     if (exprNode.type === 'BooleanValue') {
         const sel = makeControl('select');
         sel.innerHTML = `<option value="true" ${exprNode.value==='true'?'selected':''}>True</option><option value="false" ${exprNode.value==='false'?'selected':''}>False</option>`;
-        sel.onchange = e => { exprNode.value = e.target.value; renderEmulator(); syncKotlinCodeToVFS(); };
+        sel.onchange = e => { exprNode.value = e.target.value; updateAllViews(); };
         el.appendChild(sel);
     } else if (exprNode.type === 'NumberValue') {
         const inp = makeControl('input');
@@ -457,15 +527,19 @@ function createExpressionBlock(exprNode, parentNode, propertyName) {
         inp.oninput = e => { exprNode.value = e.target.value; renderEmulator(); syncKotlinCodeToVFS(); };
         el.appendChild(inp);
     } else if (exprNode.type === 'VarValue') {
-        if (!getAllVariables().includes(exprNode.props.varName)) el.classList.add('invalid-ref'); // Warnung bei fehlender Variable
-        el.appendChild(createVariableDropdown(exprNode.props.varName, e => { exprNode.props.varName = e.target.value; renderEmulator(); syncKotlinCodeToVFS(); }));
+        if (exprNode.props.varName && !appModel.variables.includes(exprNode.props.varName) && !localVars.includes(exprNode.props.varName)) {
+            el.classList.add('invalid-ref'); 
+        }
+        el.appendChild(createVariableDropdown(exprNode.props.varName, e => { exprNode.props.varName = e; updateAllViews(); }, localVars));
     } else if (exprNode.type === 'CallFunctionExpr') {
-        if (!appModel.functions.some(f => f.name === exprNode.props.funcName)) el.classList.add('invalid-ref'); // Warnung bei fehlender Funktion
+        if (exprNode.props.funcName && !appModel.functions.some(f => f.name === exprNode.props.funcName)) {
+            el.classList.add('invalid-ref'); 
+        }
         
         el.appendChild(document.createTextNode('Call '));
         el.appendChild(createFunctionDropdown(exprNode.props.funcName, e => { 
-            exprNode.props.funcName = e.target.value; 
-            let f = appModel.functions.find(x => x.name === e.target.value);
+            exprNode.props.funcName = e; 
+            let f = appModel.functions.find(x => x.name === e);
             exprNode.args = {};
             if(f) f.params.forEach(p => exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
             updateAllViews();
@@ -479,26 +553,26 @@ function createExpressionBlock(exprNode, parentNode, propertyName) {
                 pWrap.style.marginLeft = "5px";
                 pWrap.innerText = p + "=";
                 if (!exprNode.args[p]) exprNode.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' };
-                pWrap.appendChild(createExpressionSlot(exprNode.args, p, 'value'));
+                pWrap.appendChild(createExpressionSlot(exprNode.args, p, 'value', localVars));
                 el.appendChild(pWrap);
             });
         }
     } else if (exprNode.type === 'Comparison') {
-        el.appendChild(createExpressionSlot(exprNode, 'left', 'value'));
+        el.appendChild(createExpressionSlot(exprNode, 'left', 'value', localVars));
         const selOp = makeControl('select');
         selOp.style.margin = '0 5px';
         ['==', '!=', '>', '<', '>=', '<='].forEach(op => { selOp.innerHTML += `<option value="${op}" ${exprNode.operator===op?'selected':''}>${op}</option>`; });
-        selOp.onchange = e => { exprNode.operator = e.target.value; renderEmulator(); syncKotlinCodeToVFS(); };
+        selOp.onchange = e => { exprNode.operator = e.target.value; updateAllViews(); };
         el.appendChild(selOp);
-        el.appendChild(createExpressionSlot(exprNode, 'right', 'value'));
+        el.appendChild(createExpressionSlot(exprNode, 'right', 'value', localVars));
     } else if (exprNode.type === 'LogicAnd' || exprNode.type === 'LogicOr') {
-        el.appendChild(createExpressionSlot(exprNode, 'left', 'boolean'));
+        el.appendChild(createExpressionSlot(exprNode, 'left', 'boolean', localVars));
         const opSpan = document.createElement('span');
         opSpan.style.margin = '0 8px';
         opSpan.style.fontWeight = 'bold';
         opSpan.innerText = exprNode.type === 'LogicAnd' ? 'AND' : 'OR';
         el.appendChild(opSpan);
-        el.appendChild(createExpressionSlot(exprNode, 'right', 'boolean'));
+        el.appendChild(createExpressionSlot(exprNode, 'right', 'boolean', localVars));
     }
 
     // Lösch-Button ("X")
@@ -526,7 +600,7 @@ function renderBlockEditor() {
     
     // Haupt-Baum rendern
     const rootWrapper = document.createElement('div');
-    rootWrapper.appendChild(createVisualBlock(appModel.screens[0].layout));
+    rootWrapper.appendChild(createVisualBlock(appModel.screens[0].layout, []));
     container.appendChild(rootWrapper);
 
     // Frei platzierte (Floating) Blöcke rendern
@@ -536,7 +610,13 @@ function renderBlockEditor() {
         fbWrapper.style.left = fb.x + 'px';
         fbWrapper.style.top = fb.y + 'px';
         
-        const blockEl = createVisualBlock(fb.node);
+        let locals = [];
+        if (fb.node.type === 'FunctionDef') {
+            let fModel = appModel.functions.find(f => f.name === fb.node.props.funcName);
+            if (fModel) locals = fModel.params;
+        }
+
+        const blockEl = createVisualBlock(fb.node, locals);
         
         // Entsättigung für alles, was keine Funktionsdefinition ist (da diese "verbunden" in sich selbst sind)
         if (fb.node.type !== 'FunctionDef') {
@@ -548,7 +628,7 @@ function renderBlockEditor() {
     });
 }
 
-function createVisualBlock(node) {
+function createVisualBlock(node, localVars = []) {
     const block = document.createElement('div');
     block.className = 'visual-block';
     block.id = 'block_' + node.id;
@@ -564,18 +644,20 @@ function createVisualBlock(node) {
     header.innerHTML = `<span>${icon}</span> <span>${node.type}</span>`;
     
     if (node.type === 'SetVariable') {
-        if (!appModel.variables.includes(node.props.varName)) block.classList.add('invalid-ref'); // Warnung
+        if (node.props.varName && !appModel.variables.includes(node.props.varName) && !localVars.includes(node.props.varName)) {
+            block.classList.add('invalid-ref'); 
+        }
 
         header.innerHTML = `<span>${icon}</span> <span>Variable</span>`;
-        header.appendChild(createVariableDropdown(node.props.varName, e => { node.props.varName = e.target.value; renderEmulator(); syncKotlinCodeToVFS(); }));
+        header.appendChild(createVariableDropdown(node.props.varName, e => { node.props.varName = e; updateAllViews(); }, localVars));
         let equals = document.createElement('span');
         equals.innerHTML = '=';
         equals.style.cssText = 'color:var(--text-main); font-weight:bold; margin: 0 5px;';
         header.appendChild(equals);
-        header.appendChild(createExpressionSlot(node, 'value', 'value'));
+        header.appendChild(createExpressionSlot(node, 'value', 'value', localVars));
     }
     else if (node.type === 'If' || node.type === 'Loop') {
-        header.appendChild(createExpressionSlot(node, 'condition', 'boolean'));
+        header.appendChild(createExpressionSlot(node, 'condition', 'boolean', localVars));
     }
     else if (node.type === 'FunctionDef') {
         let fModel = appModel.functions.find(f => f.name === node.props.funcName);
@@ -583,12 +665,14 @@ function createVisualBlock(node) {
         header.innerHTML = `<span>${icon}</span> <span>Funktion: <b>${node.props.funcName}${pStr}</b></span>`;
     }
     else if (node.type === 'CallFunction') {
-        if (!appModel.functions.some(f => f.name === node.props.funcName)) block.classList.add('invalid-ref'); // Warnung
+        if (node.props.funcName && !appModel.functions.some(f => f.name === node.props.funcName)) {
+            block.classList.add('invalid-ref');
+        }
 
         header.innerHTML = `<span>${icon}</span> <span>Aufruf:</span>`;
         header.appendChild(createFunctionDropdown(node.props.funcName, e => { 
-            node.props.funcName = e.target.value; 
-            let f = appModel.functions.find(x => x.name === e.target.value);
+            node.props.funcName = e; 
+            let f = appModel.functions.find(x => x.name === e);
             node.args = {};
             if(f) f.params.forEach(p => node.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' });
             updateAllViews();
@@ -603,14 +687,14 @@ function createVisualBlock(node) {
                 pRow.style.display = "flex"; pRow.style.alignItems = "center";
                 pRow.innerHTML = `<span style="margin-right:6px; font-weight:500;">${p} = </span>`;
                 if (!node.args[p]) node.args[p] = { type: 'NumberValue', id: genId('exp'), value: '0' };
-                pRow.appendChild(createExpressionSlot(node.args, p, 'value'));
+                pRow.appendChild(createExpressionSlot(node.args, p, 'value', localVars));
                 header.appendChild(pRow);
             });
         }
     }
     else if (node.type === 'Return') {
         header.innerHTML = `<span>${icon}</span> <span>Return</span>`;
-        header.appendChild(createExpressionSlot(node, 'value', 'value'));
+        header.appendChild(createExpressionSlot(node, 'value', 'value', localVars));
     }
     
     if (node.id !== 'root_scaffold') {
@@ -654,7 +738,7 @@ function createVisualBlock(node) {
         for (let i = 0; i <= childCount; i++) {
             childrenContainer.appendChild(createDropZone(node.id, i));
             if (i < childCount) {
-                childrenContainer.appendChild(createVisualBlock(node.children[i]));
+                childrenContainer.appendChild(createVisualBlock(node.children[i], localVars));
             }
         }
         block.appendChild(childrenContainer);
@@ -1091,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault(); 
         }
     });
-    blockEditor.addEventListener('drop', e => {
+    blockEditor.addEventListener('drop', async e => {
         e.preventDefault();
         try {
             let data = JSON.parse(e.dataTransfer.getData('application/json'));
@@ -1108,10 +1192,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     children: (['Scaffold', 'If', 'Loop', 'FunctionDef'].includes(data.type)) ? [] : undefined
                 };
                 if (data.type === 'Greeting') newNode.props = { name: "Neu" };
-                if (data.type === 'SetVariable') { newNode.props = { varName: getAllVariables()[0] || '' }; newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' }; }
                 if (data.type === 'If' || data.type === 'Loop') newNode.condition = { type: 'BooleanValue', id: genId('exp'), value: 'true' };
                 if (data.type === 'Return') { newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' }; }
                 
+                if (data.type === 'SetVariable') { 
+                    // Auf dem Canvas-Root gibt es keine lokalen Variablen, nur Globale
+                    let selectedVar = appModel.variables[0] || '';
+                    if (!selectedVar) {
+                        selectedVar = await promptNewVariable();
+                        if (!selectedVar) { clearDragState(); return; }
+                    }
+                    newNode.props = { varName: selectedVar };
+                    newNode.value = { type: 'NumberValue', id: genId('exp'), value: '0' };
+                }
                 if (data.type === 'CallFunction') { 
                     let f = appModel.functions[0];
                     newNode.props = { funcName: f ? f.name : '' }; 
@@ -1129,6 +1222,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAllViews();
         } catch(err) { console.error("Canvas Drop Fehler:", err); }
         
-        clearDragState(); // Sicheres Aufräumen der CSS-Klassen
+        clearDragState();
     });
 });
